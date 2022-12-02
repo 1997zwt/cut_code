@@ -1,8 +1,8 @@
 #include "cut_tool.h"
 #include "grip.h"
 
-#define SOFT_VERSION	4217
-#define SOFT_DATE		20221102
+#define SOFT_VERSION	4218
+#define SOFT_DATE		20221202
 
 #define SetPowerOn()		   POWON_GPIO_PORT->BSRR = POWON_GPIO_PIN;  //开机
 #define SetPowerOff()		    POWON_GPIO_PORT->BRR = POWON_GPIO_PIN;   //关机
@@ -316,7 +316,7 @@ void PowerButtonScan(void)
 			else if (gBt_power_tm >= 10000)
 			{
 				PowerLEDFlash(500);  
-				//GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
+				GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
 			}
 			else if (gBt_power_tm >= 500)
 			{
