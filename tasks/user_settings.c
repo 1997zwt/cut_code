@@ -1,4 +1,5 @@
 #include "user_settings.h"
+#include "iap.h"
 
 //存储用户数据，上电从flash中读取
 int32_t  gUserSettings[USER_SETTING_SIZE] = {0};
@@ -26,6 +27,7 @@ void InitUserSettings(uint8_t flg)
 		{
 			gUserSettings[i]=0;
 		}
+		gUserSettings[VER_DEVICE_ID] = iapUserSettings[IAP_VER_DEVICE_ID];
 		gUserSettings[VER_SOFT] = 301;//3.01
 		gUserSettings[VER_SOFT_DATE] = 20200602;//2020.6.2
 		gUserSettings[VER_SETTINGS] = 301;//
@@ -98,8 +100,10 @@ void InitUserSettings(uint8_t flg)
 #ifdef USE_PROTOCOL_V3
 		gUserSettings[SYS_FLGS] |= (3<<16);
 #endif
+	gUserSettings[WORK_TIMES] = iapUserSettings[IAP_WORK_TIMES];
 	}
-	gUserSettings[POWER_LOW_LIMIT] = 10;  
+		
+	gUserSettings[POWER_LOW_LIMIT] = 10;		
 	if(gUserSettings[VER_MODIFY_TIMES] == 0)
 	{
 		SaveUserSettings();

@@ -345,7 +345,7 @@ void Task_Protocol(void *p_arg)
 	#ifdef	__IAP_H_
 						if (databuf[3] == DEVICE_CMD_UPGRADE)
 						{
-							IAP_Handle("update");
+							IAP_Handle("menu");
 						}
 	#endif
 	#ifdef _CUT_TOOL_H

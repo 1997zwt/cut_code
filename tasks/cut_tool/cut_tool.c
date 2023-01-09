@@ -1,8 +1,8 @@
 #include "cut_tool.h"
 #include "grip.h"
 
-#define SOFT_VERSION	4218
-#define SOFT_DATE		20221202
+#define SOFT_VERSION	4219
+#define SOFT_DATE		20221228
 
 #define SetPowerOn()		   POWON_GPIO_PORT->BSRR = POWON_GPIO_PIN;  //开机
 #define SetPowerOff()		    POWON_GPIO_PORT->BRR = POWON_GPIO_PIN;   //关机
@@ -372,6 +372,10 @@ void PowerButtonScan(void)
 				{
 					WriteUserSettings(VER_MODIFY_TIMES,ReadUserSettings(VER_MODIFY_TIMES)-1);
 					SaveUserSettings();
+					#ifdef USE_BOOTLOADER
+					IAP_FUN_WriteFlag(IAP_WRITE_POWER,0,POWER_OFF_DATA); 
+					#endif
+
 					delay_ms(10);
 					SetPowerOff();
 				}
@@ -419,6 +423,7 @@ void InitAllMotors(void)
 
 void InitAllDevice(void)
 {
+	uint16_t succrunFLAG;
 	USART_MUTEX = OSMutexCreate(MUTEX_TASK_PRIO,&m_err);
 	GPIO_Config();
 	CanBus_Init(0,CAN_BURD_1M);
@@ -428,6 +433,14 @@ void InitAllDevice(void)
 	USART_Config(TOOL_CONTROL_PORT,115200);
 	PR_Time3PWMInit(TIME3_PWM_FREQUENCY);
 	IWDG_Init(1000);		//看门狗1S超时
+	#ifdef USE_BOOTLOADER
+	IAP_ReadALLFlag(); //读取所有IAP相关标志位
+	succrunFLAG = (uint16_t)IAP_ReadSingleFlag(FINISH_RUNNING_ADDR);
+	if(succrunFLAG != SUCC_RUNNING_DATA)
+	{
+		IAP_FUN_WriteFlag(IAP_WRITE_RUNNING,SUCC_RUNNING_DATA,0); 
+	}
+	#endif
 	InitUserSettings(1);
 	InitAllMotors();
 
@@ -743,11 +756,11 @@ void Task_Tool(void *p_arg)
 	uint16_t tm_cut_1 = 0;
 	uint16_t tm_cut_2 = 0;
 
-	if(!ReadUserSettings(WIFI_NET_CONFIG))
-	{
-		CoifigWifiNet();
-		WriteUserSettings(WIFI_NET_CONFIG,1);
-	}
+//	if(!ReadUserSettings(WIFI_NET_CONFIG))
+//	{
+//		CoifigWifiNet();
+//		WriteUserSettings(WIFI_NET_CONFIG,1);
+//	}
 	for(;;)
 	{
 		StateLEDFlash(500);
