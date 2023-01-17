@@ -94,5 +94,6 @@ int32_t ReadUserSettings(uint8_t addr);
 void ConfigUserSettings(uint8_t cmd, uint8_t* data);
 void WriteUserSettings(uint8_t addr, int32_t val);
 void SaveUserSettings(void);
+void WriteIAPSettings(void);
 #endif
 /******************* (C) COPYRIGHT 2020 REAPDARO *****END OF FILE****/

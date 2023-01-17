@@ -373,6 +373,7 @@ void PowerButtonScan(void)
 					WriteUserSettings(VER_MODIFY_TIMES,ReadUserSettings(VER_MODIFY_TIMES)-1);
 					SaveUserSettings();
 					#ifdef USE_BOOTLOADER
+					iapUserSettings[IAP_WORK_TIMES]=gWorkTimes;
 					IAP_FUN_WriteFlag(IAP_WRITE_POWER,0,POWER_OFF_DATA); 
 					#endif
 
@@ -630,7 +631,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 					rt = RT_TOOL_NOT_HOME;
 				break;
 			case TOOL_CMD_HOME:
-				if (tool_state != TOOL_STATE_WORK)
+				if (tool_state != TOOL_STATE_WORK&&tool_state!= TOOL_STATE_PREPARING)
 				{
 					Grip_Control(MOTOR_CMD_HOME,0);
 					CutMotorControl(MOTOR_CMD_HOME,0);
@@ -705,13 +706,13 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 		if (TSB(motor,CAMERA_POWER))
 		{
 			if (cmd == 0)
-			{	
-				GPIO_SetBits(CAMERA_GPIO_PORT, CAMERA_GPIO_PIN);
+			{				
+				GPIO_ResetBits(CAMERA_GPIO_PORT, CAMERA_GPIO_PIN);
 				gCameraState = 0;
 			}
 			else
 			{
-				GPIO_ResetBits(CAMERA_GPIO_PORT, CAMERA_GPIO_PIN);
+				GPIO_SetBits(CAMERA_GPIO_PORT, CAMERA_GPIO_PIN);			
 				gCameraState = 1;
 			}
 		}

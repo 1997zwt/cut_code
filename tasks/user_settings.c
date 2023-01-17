@@ -27,7 +27,7 @@ void InitUserSettings(uint8_t flg)
 		{
 			gUserSettings[i]=0;
 		}
-		gUserSettings[VER_DEVICE_ID] = iapUserSettings[IAP_VER_DEVICE_ID];
+		
 		gUserSettings[VER_SOFT] = 301;//3.01
 		gUserSettings[VER_SOFT_DATE] = 20200602;//2020.6.2
 		gUserSettings[VER_SETTINGS] = 301;//
@@ -100,7 +100,14 @@ void InitUserSettings(uint8_t flg)
 #ifdef USE_PROTOCOL_V3
 		gUserSettings[SYS_FLGS] |= (3<<16);
 #endif
+	gUserSettings[VER_DEVICE_ID] = iapUserSettings[IAP_VER_DEVICE_ID];
 	gUserSettings[WORK_TIMES] = iapUserSettings[IAP_WORK_TIMES];
+	if(gUserSettings[VER_DEVICE_ID]==-1 || gUserSettings[WORK_TIMES]==-1)
+	{
+		gUserSettings[VER_DEVICE_ID]=0;
+		gUserSettings[WORK_TIMES] = 0;
+	}
+	
 	}
 		
 	gUserSettings[POWER_LOW_LIMIT] = 10;		
@@ -221,7 +228,17 @@ void ConfitAllSettings(uint8_t* data)
 			WriteUserSettings(addr,val);
 		}
 	}
+	#ifdef USE_BOOTLOADER
+	WriteIAPSettings();
+	#endif
 }
+
+void WriteIAPSettings(void)
+{
+	iapUserSettings[IAP_VER_DEVICE_ID] = gUserSettings[VER_DEVICE_ID];
+	iapUserSettings[IAP_WORK_TIMES] = gUserSettings[WORK_TIMES];
+}
+
 void ConfigUserSettings(uint8_t cmd, uint8_t* data)
 {
 	uint8_t addr = 0;
@@ -239,6 +256,9 @@ void ConfigUserSettings(uint8_t cmd, uint8_t* data)
 		{
 			val = CombineU32_HF(data+1);
 			WriteUserSettings(addr,val);
+			#ifdef USE_BOOTLOADER
+			WriteIAPSettings();
+			#endif
 		}
 		break;
 	case USER_FLASH_READ:
@@ -260,6 +280,9 @@ void ConfigUserSettings(uint8_t cmd, uint8_t* data)
 		{
 			val = CombineU32_HF(data+1);
 			WriteUserSettings(addr,val);
+			#ifdef USE_BOOTLOADER
+			WriteIAPSettings();
+			#endif
 		}
 		break;
 	}
