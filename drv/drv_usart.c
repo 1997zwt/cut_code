@@ -370,6 +370,8 @@ void USART_Config(USART_TypeDef* USARTx, uint32_t BaudRate)
 	}
 }
 
+
+
 void USART_FrameBufWrite(enUartFrameBuf bufx)
 {  
   if(FrameBufWptr[bufx] == (FrameBufRptr[bufx] - 1))     /*·ÀÖ¹Ì×È¦*/

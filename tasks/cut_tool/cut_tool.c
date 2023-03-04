@@ -1,8 +1,9 @@
 #include "cut_tool.h"
 #include "grip.h"
+#include "lidischarge.h"
 
-#define SOFT_VERSION	4219
-#define SOFT_DATE		20221228
+#define SOFT_VERSION	4220
+#define SOFT_DATE		20230303
 
 #define SetPowerOn()		   POWON_GPIO_PORT->BSRR = POWON_GPIO_PIN;  //开机
 #define SetPowerOff()		    POWON_GPIO_PORT->BRR = POWON_GPIO_PIN;   //关机
@@ -31,18 +32,8 @@ uint8_t m_err;
  
 uint8_t GetBattaryQuantity(void)
 {
-	uint8_t bq = 0;
-	uint32_t battery_mv = 0;
 
-	battery_mv = ADC1_GetValue_mv(BATTARY_VOLTAGE_CHANNEL)*MV_TO_BATTARY;
-	if(battery_mv >= 20000)  bq=100;
-	else if(battery_mv <= 17000) bq = 0;
-	else
-	{
-		bq = (battery_mv-17000)/30;
-	}
-
-	return bq;
+	return (u8)Lisup. CurQtity;
 }
 
 void CutTool_SendState(void)    //状态反馈
@@ -1000,6 +991,7 @@ void Task_Tool(void *p_arg)
 		tm_cut += 20;
 		if (tm_cut > 100)
 		{
+			Realtime_Qtity();
 			CutTool_SendState();
 			tm_cut = 0;
 		}
@@ -1008,4 +1000,5 @@ void Task_Tool(void *p_arg)
 		IWDG_Feed();
 	}
 }
+
 

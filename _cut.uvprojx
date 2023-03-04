@@ -483,6 +483,11 @@
               <FileType>1</FileType>
               <FilePath>.\stm32f10x_it.c</FilePath>
             </File>
+            <File>
+              <FileName>lidischarge.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\tasks\lidischarge.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1158,6 +1163,11 @@
               <FileName>stm32f10x_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\stm32f10x_it.c</FilePath>
+            </File>
+            <File>
+              <FileName>lidischarge.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\tasks\lidischarge.c</FilePath>
             </File>
           </Files>
         </Group>
