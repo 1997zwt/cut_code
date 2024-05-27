@@ -1,4 +1,5 @@
 #include "drv_usart.h"
+#include "stdio.h"
 
 USART_TypeDef* gUsartDef[5] = {USART1,USART2,USART3,UART4,UART5};
 OS_EVENT* gUsartGetDataSem[5];
@@ -413,5 +414,13 @@ void UART_SendBuf(USART_TypeDef* USARTx, uint8_t *buf, uint16_t buflen)
     }
 }
 
-
+int fputc(int ch ,FILE *f)
+{
+	USART_SendData(USART1, (uint8_t) ch);
+	while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET)
+	{}
+	
+		return (ch);
+		
+}
 

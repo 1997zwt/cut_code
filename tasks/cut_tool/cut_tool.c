@@ -1,9 +1,10 @@
 #include "cut_tool.h"
 #include "grip.h"
 #include "lidischarge.h"
+#include "stdio.h"
 
-#define SOFT_VERSION	4220
-#define SOFT_DATE		20230303
+#define SOFT_VERSION	4221
+#define SOFT_DATE		20230602
 
 #define SetPowerOn()		   POWON_GPIO_PORT->BSRR = POWON_GPIO_PIN;  //开机
 #define SetPowerOff()		    POWON_GPIO_PORT->BRR = POWON_GPIO_PIN;   //关机
@@ -303,6 +304,7 @@ void PowerButtonScan(void)
 			if (gBt_power_tm >= 15000)//15秒
 			{
 				PowerLEDFlash(100);//按钮灯快闪
+				CutTool_Control(0,TOOL_CMD_FACTORY_RESET,0);
 			}
 			else if (gBt_power_tm >= 10000)
 			{
@@ -361,6 +363,7 @@ void PowerButtonScan(void)
 			{
 				if (power_state)
 				{
+					power_state = 0;
 					WriteUserSettings(VER_MODIFY_TIMES,ReadUserSettings(VER_MODIFY_TIMES)-1);
 					SaveUserSettings();
 					#ifdef USE_BOOTLOADER

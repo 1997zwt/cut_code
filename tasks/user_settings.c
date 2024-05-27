@@ -2,6 +2,7 @@
 #include "iap.h"
 
 //存储用户数据，上电从flash中读取
+extern int32_t gWorkTimes;
 int32_t  gUserSettings[USER_SETTING_SIZE] = {0};
 void SaveUserSettings(void);
 bool LoadUserSettings(void);
@@ -237,6 +238,7 @@ void WriteIAPSettings(void)
 {
 	iapUserSettings[IAP_VER_DEVICE_ID] = gUserSettings[VER_DEVICE_ID];
 	iapUserSettings[IAP_WORK_TIMES] = gUserSettings[WORK_TIMES];
+	gWorkTimes = iapUserSettings[IAP_WORK_TIMES];
 }
 
 void ConfigUserSettings(uint8_t cmd, uint8_t* data)

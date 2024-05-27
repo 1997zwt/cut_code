@@ -19,8 +19,8 @@ u8 Ifsys=0;
 void Realtime_Qtity(void)
 {
 	int16_t CurVoltage;//mv	
-	static int qtime = 0;
-	static int qkptime=0;
+//	static int qtime = 0;
+//	static int qkptime=0;
 
 	/* 获取电池放电当前电压 */
 	CurVoltage = Get_vol();
@@ -29,24 +29,23 @@ void Realtime_Qtity(void)
 		Libat1.jitterVol=11;//mv
 		Libat1.StartVol = CurVoltage;
 		Libat1.SlopeVol = 32.258;  //20秒降1个11
-		Libat1.SlopeQ = 42;		
-		Libat1.EndVol=16700;
-		Libat1.EndQtity = 15;						
+		Libat1.SlopeQ = 32;		
+		Libat1.EndVol=17000;
+		Libat1.EndQtity = 0;						
 		
 		Libat1.DownRang = 11;
 		
-		Libat2.jitterVol=11;//mv
-		//Libat2.StartVol = CurVoltage;
-		Libat2.SlopeVol = 16.474;  //40秒降1个11
-		Libat2.SlopeQ = 400;		
-		Libat2.EndVol=15000;
-		Libat2.EndQtity = 10;		
+		// Libat2.jitterVol=11;//mv
+		// Libat2.SlopeVol = 16.474;  //40秒降1个11
+		// Libat2.SlopeQ = 400;		
+		// Libat2.EndVol=15000;
+		// Libat2.EndQtity = 10;		
 
-		Libat3.jitterVol=11;//mv
-		Libat3.SlopeVol = 265.3;  //2.5秒降1个11
-		Libat3.SlopeQ =1000;		
-		Libat3.EndVol=5000;
-		Libat3.EndQtity = 0;		
+		// Libat3.jitterVol=11;//mv
+		// Libat3.SlopeVol = 265.3;  //2.5秒降1个11
+		// Libat3.SlopeQ =1000;		
+		// Libat3.EndVol=5000;
+		// Libat3.EndQtity = 0;		
 		
 		Lisup.LastVol = CurVoltage;		
 		Lisup.LastQtity = 100.0;
@@ -122,12 +121,7 @@ void Realtime_Qtity(void)
 	}
 	
 }
-int fputc(int ch,FILE *stream)
-{
-	while((USART1->SR & 0X40)==0);
-	USART1->DR = (u8)ch;
-	return ch;
-}
+
 int16_t Get_vol(void)
 {
 	return ADC1_GetValue_mv(BATTARY_VOLTAGE_CHANNEL)*MV_TO_BATTARY;
@@ -211,13 +205,14 @@ float Get_Qtity(int16_t vol)
 		if(Lisup.keepvol>=Libat1.EndVol)
 		{
 			Lisup.keepvol = Lisup.keepvol - Libat1.SlopeVol;//每减少量
-		}else if(Lisup.keepvol>Libat2.EndVol&&Lisup.keepvol<Libat1.EndVol)
-		{
-			Lisup.keepvol = Lisup.keepvol - Libat2.SlopeVol;
-		}else if(Lisup.keepvol>Libat3.EndVol&&Lisup.keepvol<Libat2.EndVol)
-		{
-			Lisup.keepvol = Lisup.keepvol - Libat3.SlopeVol;
 		}
+		// else if(Lisup.keepvol>Libat2.EndVol&&Lisup.keepvol<Libat1.EndVol)
+		// {
+			// Lisup.keepvol = Lisup.keepvol - Libat2.SlopeVol;
+		// }else if(Lisup.keepvol>Libat3.EndVol&&Lisup.keepvol<Libat2.EndVol)
+		// {
+			// Lisup.keepvol = Lisup.keepvol - Libat3.SlopeVol;
+		// }
 		
 		Lisup.time = 0;		
 	}else if(downflg==1)
@@ -228,24 +223,30 @@ float Get_Qtity(int16_t vol)
 	if(voltrue>=Libat1.EndVol)
 	{
 		TempQuantity = (voltrue-Libat1.EndVol)/(float)Libat1.SlopeQ+Libat1.EndQtity;
-	}else if(voltrue>Libat2.EndVol&&voltrue<Libat1.EndVol)
-	{
-		TempQuantity = (voltrue-Libat2.EndVol)/(float)Libat2.SlopeQ+Libat2.EndQtity;
-		if(TempQuantity>Libat1.EndQtity)
-		{
-			TempQuantity = Libat1.EndQtity;
-		}
-	}else if(voltrue>Libat3.EndVol&&voltrue<Libat2.EndVol)
-	{
-		TempQuantity = (voltrue-Libat3.EndVol)/(float)Libat3.SlopeQ+Libat3.EndQtity;
-		if(TempQuantity>Libat2.EndQtity)
-		{
-			TempQuantity = Libat2.EndQtity;
-		}
 	}
+	// else if(voltrue>Libat2.EndVol&&voltrue<Libat1.EndVol)
+	// {
+		// TempQuantity = (voltrue-Libat2.EndVol)/(float)Libat2.SlopeQ+Libat2.EndQtity;
+		// if(TempQuantity>Libat1.EndQtity)
+		// {
+			// TempQuantity = Libat1.EndQtity;
+		// }
+	// }
+	// else if(voltrue>Libat3.EndVol&&voltrue<Libat2.EndVol)
+	// {
+		// TempQuantity = (voltrue-Libat3.EndVol)/(float)Libat3.SlopeQ+Libat3.EndQtity;
+		// if(TempQuantity>Libat2.EndQtity)
+		// {
+			// TempQuantity = Libat2.EndQtity;
+		// }
+	// }
+	
 	
 	if(TempQuantity>=100){
 		TempQuantity = 100;
+	}else if(TempQuantity<=1)
+	{
+		TempQuantity =1;
 	}
 	return TempQuantity;
 }
@@ -261,5 +262,3 @@ u16 Get_time11(u16 x)
 	}	
 	return (u16)(y*10);
 }
-
-
