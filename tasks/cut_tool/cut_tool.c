@@ -921,11 +921,7 @@ void Task_Tool(void *p_arg)
 				if(tool_state == TOOL_STATE_PREPARING)
 				{
 					gCutPauseTm += 20;
-					// if (gGripModuleState == MODULE_STATE_MAX)
-					// {
-					// 	gCutPauseTm = gCutPauseTm + (gCutPauseTm>>2);//测试值，切刀运动时间是抱紧运动时间的1.25倍
-					// 	tool_state = TOOL_STATE_READY;						
-					// }
+
 					if (gGripState == MODULE_STATE_MAX)
 					{
 						tool_state = TOOL_STATE_READY;						
