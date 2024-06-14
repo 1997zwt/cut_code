@@ -2,7 +2,7 @@
 #include "grip.h"
 
 #define SOFT_VERSION	4219
-#define SOFT_DATE		20221228
+#define SOFT_DATE		20240613
 
 #define SetPowerOn()		   POWON_GPIO_PORT->BSRR = POWON_GPIO_PIN;  //开机
 #define SetPowerOff()		    POWON_GPIO_PORT->BRR = POWON_GPIO_PIN;   //关机
@@ -914,6 +914,24 @@ void Task_Tool(void *p_arg)
 				tm_cut_1 = 0;
 			}
 		}
+		
+		if(tool_state == TOOL_STATE_PREPARING)
+		{
+			gCutPauseTm += 20;
+			// if (gGripModuleState == MODULE_STATE_MAX)
+			// {
+			// 	gCutPauseTm = gCutPauseTm + (gCutPauseTm>>2);//测试值，切刀运动时间是抱紧运动时间的1.25倍
+			// 	tool_state = TOOL_STATE_READY;						
+			// }
+			if (gGripState == MODULE_STATE_MAX)
+			{
+				tool_state = TOOL_STATE_READY;						
+			}
+			else if (gGripState == MODULE_STATE_P_LIM)
+			{
+				tool_state = TOOL_STATE_ERROR1;						
+			}
+		}
 
 
 		if(IsHomeSensorOn())
@@ -923,24 +941,7 @@ void Task_Tool(void *p_arg)
 			{
 				gCutModuleState = MODULE_STATE_HOME;
 
-				if(tool_state == TOOL_STATE_PREPARING)
-				{
-					gCutPauseTm += 20;
-					// if (gGripModuleState == MODULE_STATE_MAX)
-					// {
-					// 	gCutPauseTm = gCutPauseTm + (gCutPauseTm>>2);//测试值，切刀运动时间是抱紧运动时间的1.25倍
-					// 	tool_state = TOOL_STATE_READY;						
-					// }
-					if (gGripState == MODULE_STATE_MAX)
-					{
-						tool_state = TOOL_STATE_READY;						
-					}
-					else if (gGripState == MODULE_STATE_P_LIM)
-					{
-						tool_state = TOOL_STATE_ERROR1;						
-					}
-				}
-				else if (tool_state == TOOL_STATE_HOMING)
+				if (tool_state == TOOL_STATE_HOMING)
 				{
 					if (gGripModuleState == MODULE_STATE_HOME)
 					{
