@@ -29,8 +29,8 @@ void InitUserSettings(uint8_t flg)
 			gUserSettings[i]=0;
 		}
 		
-		gUserSettings[VER_SOFT] = 301;//3.01
-		gUserSettings[VER_SOFT_DATE] = 20200602;//2020.6.2
+		gUserSettings[VER_SOFT] = 4222;//3.01
+		gUserSettings[VER_SOFT_DATE] = 20240614;//2020.6.2
 		gUserSettings[VER_SETTINGS] = 301;//
 		gUserSettings[VER_SETTINGS_DATE] = 20200604;//
 		gUserSettings[VER_MODIFY_TIMES] = 0;
@@ -51,7 +51,7 @@ void InitUserSettings(uint8_t flg)
 		gUserSettings[GRIP_WORK_CURRENT] = 1200;    //800有线的时候用的是电流
 		gUserSettings[GRIP_HOME_CURRENT] = 1000;  //500第一次复位的时候用电流
 		gUserSettings[GRIP_MOVE_OVERTIME] = 7000;
-		gUserSettings[GRIP_POSITIVE_LIMIT] = 27;  //没线的时候用的是位置限位
+		gUserSettings[GRIP_POSITIVE_LIMIT] = 300;  //没线的时候用的是位置限位
 		gUserSettings[GRIP_NEGATIVE_LIMIT] = 0;  //有线的时候用的是位置限位
 
 #endif

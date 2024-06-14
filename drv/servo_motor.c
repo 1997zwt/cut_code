@@ -1,6 +1,11 @@
-#include "servo_motor.h"
+#include "dj_motor.h"
+
+//2024.3月更新
 
 #if (defined SERVO_MOTOR_NUM) && (SERVO_MOTOR_NUM > 0)
+
+uint32_t  cmd_test_tim = 0;
+uint32_t  state_test_tim = 0;
 
 //电机列表
 static stServoMotorDef* gServoMotors[SERVO_MOTOR_NUM];
@@ -91,7 +96,7 @@ uint32_t _GetMotorState(stServoMotorDef* motor, uint8_t bit)
 	return (uint32_t)gMotorCtrlWord[motor->motor_index][MOTOR_STATE]&((uint32_t)(1<<bit));
 }
 
-static void _SetMotorPWM(stServoMotorDef* motor, int16_t DutyRadio)
+static void _SetMotorPWM(stServoMotorDef* motor, int32_t DutyRadio)
 {
 	Limit(DutyRadio, PWM_DUTY_RANGE_DEF);
 
@@ -152,20 +157,31 @@ static void _Position_Loop_Control(stServoMotorDef* motor)
 
 	target_position = exGetMotorControlWord(motor,PLP_TARGET_VAL);
 	profile_position = exGetMotorControlWord(motor,PLP_PROFILED_VAL);
-	max_velocity = exGetMotorControlWord(motor,PLP_MAX_VEL);
+	//max_velocity = exGetMotorControlWord(motor,PLP_MAX_VEL);
+	max_velocity = (exGetMotorControlWord(motor,PLP_MAX_VEL)<<11)/15;
 	_LinearAcceleration(max_velocity,target_position,&profile_position);
 	err = profile_position - actual_position;
 	exSetMotorControlWord(motor,PLP_PROFILED_VAL,profile_position);
 	exSetMotorControlWord(motor,PLP_ERROR,err);
 	pid_out = iPosPIDCal(&(motor->pids[PID_P]),err)>>10;
 
+	if (ABS(pid_out) < motor->motor_desp.encoder_resolution)
+	{
+		_SetMotorState(motor, STA_POSITION_REACH, TRUE);
+		pid_out = 0;
+	}
+	else if (pid_out > (motor->motor_desp.encoder_resolution*2))
+	{
+		_SetMotorState(motor, STA_POSITION_REACH, FALSE);
+	}
+	
 	if (_GetMotorState(motor,STA_V_LOOP))
 	{
 		Limit(pid_out,exGetMotorControlWord(motor,PLP_MAX_VEL));
 		exSetMotorControlWord(motor,VLP_TARGET_VAL_1,pid_out);
 		exSetMotorControlWord(motor,VLP_TARGET_VAL,pid_out*15/motor->motor_desp.encoder_resolution);
 	} 
-	else	if (_GetMotorState(motor,STA_I_LOOP))//没有速度环，输出直接到电流环
+	else if (_GetMotorState(motor,STA_I_LOOP))//没有速度环，输出直接到电流环
 	{
 		Limit(pid_out,exGetMotorControlWord(motor,CLP_LIMIT));
 		exSetMotorControlWord(motor,CLP_TARGET_VAL,pid_out);
@@ -175,7 +191,6 @@ static void _Position_Loop_Control(stServoMotorDef* motor)
 		Limit(pid_out,4000);
 		if (ABS(err) < 200)
 		{
-			_SetMotorState(motor,STA_POSITION_REACH,TRUE);	
 			pid_out = 0;
 		}
 		_SetMotorPWM(motor,pid_out);
@@ -183,15 +198,14 @@ static void _Position_Loop_Control(stServoMotorDef* motor)
 
 	return;
 }
-
 static void _Velocity_Loop_Control(stServoMotorDef* motor)
 {	
 	int32_t  target_velocity = 0;
 	int32_t  actual_velocity = 0;
 	int32_t  profile_velocity = 0;
 	int32_t acc = 0;
-	int32_t err = 0;
 	int32_t pid_out = 0;
+	int32_t err = 0;
 
 	//速度采样
 	if (_GetMotorState(motor,STA_HAVE_V_SENSOR))
@@ -216,6 +230,10 @@ static void _Velocity_Loop_Control(stServoMotorDef* motor)
 	{
 		_SetMotorState(motor,STA_SPEED_REACH,TRUE);	
 	}
+	else if (ABS(err) > motor->motor_desp.encoder_resolution*2)
+	{
+		_SetMotorState(motor,STA_SPEED_REACH,FALSE);	
+	}
 	exSetMotorControlWord(motor,VLP_ERROR_1,err);
 	exSetMotorControlWord(motor,VLP_ERROR,err*15/motor->motor_desp.encoder_resolution);
 	pid_out = iPosPIDCal(&(motor->pids[PID_V]),err)>>10;
@@ -223,8 +241,19 @@ static void _Velocity_Loop_Control(stServoMotorDef* motor)
 	{
 		target_velocity = 0;
 		profile_velocity = 0;
-		pid_out = 0;
+	//	pid_out = 0;
 	}
+	if (ABS(motor->pids[PID_V].ei) > 10000000)//速度环积分饱和
+	{
+		_SetMotorError(motor, ERR_VLOOP_SATURATION, TRUE);
+		motor->pids[PID_V].ei = 10000000 * SIG(motor->pids[PID_V].ei);
+//		pid_out = 0;//积分饱和在外部进行判断处理
+	}
+	else
+	{
+		_SetMotorError(motor, ERR_VLOOP_SATURATION, FALSE);
+	}
+
 	if(ABS(profile_velocity) < motor->motor_desp.encoder_resolution)
 	{
 		motor->pids[PID_V].ei >>=1;
@@ -241,6 +270,7 @@ static void _Velocity_Loop_Control(stServoMotorDef* motor)
 
 	return;
 }
+
 static void _Current_Loop_Control(stServoMotorDef* motor)
 {
 	int32_t  target_current = 0;
@@ -264,9 +294,13 @@ static void _Current_Loop_Control(stServoMotorDef* motor)
 	exSetMotorControlWord(motor,CLP_CONTINUOUS_VAL,actual_current);		
 	if (ABS(actual_current) > motor->motor_desp.current_max_ma)//电流超限幅报警
 	{
-		_SetMotorState(motor,STA_ERROR,TRUE);
+//		_SetMotorState(motor,STA_ERROR,TRUE);
 		_SetMotorError(motor,ERR_CURRENT_OVERLOAD,TRUE);
 		_SetMotorPWM(motor,0);
+	}
+	else
+	{
+		_SetMotorError(motor, ERR_CURRENT_OVERLOAD, FALSE);
 	}
 	
 	if(_GetMotorState(gServoMotors[gMotorIndex],STA_ERROR))	return;
@@ -277,10 +311,20 @@ static void _Current_Loop_Control(stServoMotorDef* motor)
 	err = target_current - actual_current;
 	exSetMotorControlWord(motor,CLP_ERROR,err);
 	pid_out = iPosPIDCal(&(motor->pids[PID_I]),err)>>10;
+	if (ABS(motor->pids[PID_I].ei) > 10000000) //电流环积分饱和
+	{
+		_SetMotorError(motor, ERR_ILOOP_SATURATION, TRUE);
+		motor->pids[PID_I].ei = 10000000 * SIG(motor->pids[PID_I].ei);
+//		pid_out = 0;
+	}
+	else
+	{
+		_SetMotorError(motor, ERR_ILOOP_SATURATION, FALSE);
+	}
 	_SetMotorPWM(motor,pid_out);
-
+	
 	//电流限幅检测，可用于速度环电流环下的过载检测
-	if (ABS(exGetMotorControlWord(motor,CLP_CONTINUOUS_VAL)) > exGetMotorControlWord(motor,CLP_LIMIT))
+	if (ABS(exGetMotorControlWord(motor, CLP_CONTINUOUS_VAL)) > exGetMotorControlWord(motor, CLP_LIMIT))
 	{
 		_SetMotorState(motor,STA_CURRENT_REACH,TRUE);	
 	}
@@ -308,7 +352,7 @@ static void _Open_Loop_Control(stServoMotorDef* motor)
 {
 	int16_t  target_pwm = 0;
 	int16_t  actual_pwm = 0;
-	uint16_t	step = 50;		//根据加速度设置，目前暂定10
+	uint16_t step = 50;		//根据加速度设置，目前暂定10
 
 	if(_GetMotorState(gServoMotors[gMotorIndex],STA_ERROR))
 	{
@@ -386,6 +430,8 @@ static void _MotorControl_callback(void *ptmr, void *parg)
 		gServoMotors[gMotorIndex]->state = exGetMotorControlWord(gServoMotors[gMotorIndex],MOTOR_STATE);
 	}
 	gMotorIndex = 0;
+	cmd_test_tim++;
+	state_test_tim++;
 }
 
 //以下为接口函数
@@ -622,12 +668,31 @@ void Servo_Motor_SetTargetVelocity(stServoMotorDef* motor, int16_t velocity_rpm)
 }
 void Servo_Motor_QuickStop(stServoMotorDef* motor)
 {
-	exSetMotorControlWord(motor,VLP_TARGET_VAL,0);
-	exSetMotorControlWord(motor,VLP_TARGET_VAL_1,0);
-	exSetMotorControlWord(motor,VLP_PROFILED_VAL,0);
-	exSetMotorControlWord(motor,VLP_PROFILED_VAL_1,0);
-	exSetMotorControlWord(motor,OLP_ACTUAL_PWM,0);
-	exSetMotorControlWord(motor,OLP_TARGET_PWM,0);
+	if (_GetMotorState(motor, STA_P_LOOP))
+	{
+//		exSetMotorControlWord(motor, PLP_TARGET_VAL, exGetMotorControlWord(motor, PLP_ACTUAL_VAL));
+//		exSetMotorControlWord(motor, PLP_PROFILED_VAL, exGetMotorControlWord(motor, PLP_ACTUAL_VAL));
+		exSetMotorControlWord(motor, PLP_MAX_VEL, 0);
+	}
+	else if (_GetMotorState(motor, STA_V_LOOP))
+	{
+		exSetMotorControlWord(motor, VLP_TARGET_VAL, 0);
+		exSetMotorControlWord(motor, VLP_TARGET_VAL_1, 0);
+		// exSetMotorControlWord(motor, VLP_PROFILED_VAL, 0);
+		// exSetMotorControlWord(motor, VLP_PROFILED_VAL_1, 0);
+	}
+	else if (_GetMotorState(motor, STA_I_LOOP))
+	{
+		exSetMotorControlWord(motor, CLP_TARGET_VAL, 0);
+		_SetMotorState(motor, STA_TIME_CONTROL, FALSE);
+	//	motor->pids[PID_I].ei = 0;
+	}
+	else
+	{
+		exSetMotorControlWord(motor, OLP_TARGET_PWM, 0);
+		exSetMotorControlWord(motor, OLP_ACTUAL_PWM, 0);
+	}
+	_SetMotorPWM(motor,0);
 }
 void Servo_Motor_SetTargetPosition(stServoMotorDef* motor, int16_t vel_limit, int32_t position)
 {

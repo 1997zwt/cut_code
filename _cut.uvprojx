@@ -275,7 +275,7 @@
               </OCR_RVCT3>
               <OCR_RVCT4>
                 <Type>1</Type>
-                <StartAddress>0x8000000</StartAddress>
+                <StartAddress>0x8003000</StartAddress>
                 <Size>0x20000</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
@@ -337,7 +337,7 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>USE_STDPERIPH_DRIVER,STM32F10X_MD</Define>
+              <Define>USE_STDPERIPH_DRIVER,STM32F10X_MD,USE_BOOTLOADER</Define>
               <Undefine></Undefine>
               <IncludePath>..\CMSIS;..\StdPeriph_Driver\inc;..\uCOS-II\Ports;..\uCOS-II\Source;..\duanxianV4.2;..\FreeModbus\modbus\include;..\FreeModbus\modbus\ascii;..\FreeModbus\modbus\functions;..\FreeModbus\modbus\rtu;..\FreeModbus\modbus\tcp;..\FreeModbus\port;.\tasks\cut_tool;.\drv;..\robot-disconnection-tool;.\tasks</IncludePath>
             </VariousControls>
@@ -442,6 +442,11 @@
               <FileName>PID.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\drv\PID.c</FilePath>
+            </File>
+            <File>
+              <FileName>servo_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\servo_motor.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -1123,6 +1128,11 @@
               <FileName>PID.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\drv\PID.c</FilePath>
+            </File>
+            <File>
+              <FileName>servo_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\servo_motor.c</FilePath>
             </File>
           </Files>
         </Group>

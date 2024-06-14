@@ -149,6 +149,7 @@ typedef enum
 	TOOL_STATE_HOLD_END,	//旋转锁线完成
 	TOOL_STATE_UNLOCKING,	//解锁中13
 	TOOL_STATE_UNLOCKED,	//解锁成功14
+	TOOL_STATE_HOMEFAILURE,
 	TOOL_STATE_MIDDLE_0=100,	//中间自定义状态
 	TOOL_STATE_MIDDLE_1
 }ToolStateDef;
@@ -164,7 +165,8 @@ typedef enum
 	MODULE_STATE_N_LIM,			//软件位置负限位
 	MODULE_STATE_HOME,			//传感器或堵转零位6
 	MODULE_STATE_MAX,				//传感器或工作极限7
-	MODULE_STATE_ERROR			//模块错误
+	MODULE_STATE_ERROR,			//模块错误
+	MODULE_STATE_POS_REACH		//模块位置控制到位
 }ModuleStateDef;
 
 typedef struct
