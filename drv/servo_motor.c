@@ -1,4 +1,4 @@
-#include "servo_motor.h"
+#include "dj_motor.h"
 
 #if (defined SERVO_MOTOR_NUM) && (SERVO_MOTOR_NUM > 0)
 

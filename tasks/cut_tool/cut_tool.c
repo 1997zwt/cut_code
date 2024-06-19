@@ -22,7 +22,7 @@ int32_t gWorkTimes = 0;
 uint8_t cut_start_position = 100;
 uint16_t gCutPauseTm=0;//切刀从工作到暂停的时间限制
 
-extern ModuleStateDef gGripState;
+extern stGripDef gGrip;
 
 OS_EVENT* USART_MUTEX;  //串口互斥量 
 uint8_t m_err;
@@ -614,12 +614,12 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 					tool_state = TOOL_STATE_PREPARING;
 					gCutPauseTm = 0;
 				}else if(gCutModuleState == MODULE_STATE_HOME){
-					if(gGripState == MODULE_STATE_N_LIM||gGripState==MODULE_STATE_HOME)
+					if(gGrip.state == MODULE_STATE_N_LIM||gGrip.state==MODULE_STATE_HOME)
 					{
 						Grip_Control(MOTOR_CMD_WORK,0);//
 						tool_state = TOOL_STATE_PREPARING;
 						gCutPauseTm = 0;
-					}else if(gGripState== MODULE_STATE_MAX)
+					}else if(gGrip.state== MODULE_STATE_MAX)
 					{
 						tool_state = TOOL_STATE_READY;
 					}else{
@@ -923,15 +923,25 @@ void Task_Tool(void *p_arg)
 			// 	gCutPauseTm = gCutPauseTm + (gCutPauseTm>>2);//测试值，切刀运动时间是抱紧运动时间的1.25倍
 			// 	tool_state = TOOL_STATE_READY;						
 			// }
-			if (gGripState == MODULE_STATE_MAX)
+			if (gGrip.state == MODULE_STATE_MAX)
 			{
 				tool_state = TOOL_STATE_READY;						
 			}
-			else if (gGripState == MODULE_STATE_P_LIM)
+			else if (gGrip.state == MODULE_STATE_P_LIM)
 			{
 				tool_state = TOOL_STATE_ERROR1;						
 			}
 		}
+		
+		if(tool_state == TOOL_STATE_HOMING||tool_state == TOOL_STATE_UNLOCKING)
+		{
+			if(gGripModuleState==MODULE_STATE_ERROR)
+			{
+				
+				tool_state=TOOL_STATE_HOMEFAILURE;
+			}
+		}
+
 
 
 		if(IsHomeSensorOn())

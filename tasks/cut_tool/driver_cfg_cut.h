@@ -68,7 +68,7 @@
 //#define		TIME1_PWM_FREQUENCY			20000	//PWM频率20K(不要改)
 //#include "../drv/drv_time1_pwm.h"
 //#endif
-
+#define GRIP_DIR_DEF -1
 #define USE_TIME3_PWM
 //#define ENABLE_TIM3_CH1
  #define ENABLE_TIM3_CH2
@@ -85,13 +85,15 @@
 #include "../drv/dj_motor.h"
 #define ID_GRIP_L_MOTOR	    3    //抱紧电机ID
 #define GRIP_GEAR_RATIO     18
+#define GRIP_MAX_DISTENCE 345 
+#define GRIP_SIN_ANGLE 897/1000
 #endif
 
 
-//#define SERVO_MOTOR_NUM			1
-//#if (defined SERVO_MOTOR_NUM) && (SERVO_MOTOR_NUM > 0)
-//#include "../drv/servo_motor.h"
-//#endif
+#define SERVO_MOTOR_NUM			1
+#if (defined SERVO_MOTOR_NUM) && (SERVO_MOTOR_NUM > 0)
+#include "../drv/dj_motor.h"
+#endif
 
 #define STEERING_MOTOR_NUM			1
 #if (defined STEERING_MOTOR_NUM) && (STEERING_MOTOR_NUM > 0)

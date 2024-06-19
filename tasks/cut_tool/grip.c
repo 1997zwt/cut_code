@@ -1,116 +1,164 @@
 #include "grip.h"
 
-//2022.1.5
+//2024.3.8
+//2024.4.11修改，0x0A指令退抱紧后状态变为位置到位
+//2024.4.22修改，增加强制解锁中途憋死报错
 
-ToolMotorStateDef gGripMotorState;
-static stDJMotorDef  gGripMotor;
-int32_t gGripMotorPos = 0;
-uint32_t gGripTim = 0;
+static stServoMotorDef gGripMotor;
 uint8_t gReserveflg = 0;
-uint16_t gReserveTime = 0;	//抱紧电机退刀时间
-ModuleStateDef gGripState = MODULE_STATE_UNINIT;
 uint8_t gGripStopFlg = 0;
+stCableDef gCable = {0};
+stGripDef gGrip;
 
-int16_t test_current=0,test_speed=0;
+int32_t Grip_GetPos(void)
+{
+	return (gGrip.motor_pos * 10 / GRIP_GEAR_RATIO) >> 13; //返回0.1mm单位的抱紧位置
+}
+stCableDef *GetCableInfo(void) //获取线缆信息
+{
+	return &gCable;
+	/*V型槽夹角110度，线缆半径为单边行程*sin(55)=单边行程*0.82左右
+	刀尖位置按照在V型槽尖角处计算
+	*/
+}
+int32_t Grip_GetPosition(void)
+{
+	gGrip.motor_pos = DJ_GetMotorAngle(ID_GRIP_L_MOTOR) * gGripMotor.motor_desp.rotate_dir;
+	return gGrip.motor_pos;
+}
+int32_t Grip_GetVelocity(void)
+{
+	gGrip.motor_speed = DJ_GetMotorSpeed(ID_GRIP_L_MOTOR) * gGripMotor.motor_desp.rotate_dir;
+	return gGrip.motor_speed;
+}
+int16_t Grip_GetCurrent(void)
+{
+	gGrip.motor_current = DJ_GetMotorCurrent(ID_GRIP_L_MOTOR) >> 2;
+	return gGrip.motor_current;
+}
+void Grip_SetPWM(uint16_t DutyRadio)
+{
+	int32_t duty = 0;
 
+	duty = exGetMotorControlWord(&gGripMotor, OLP_ACTUAL_PWM) * gGripMotor.motor_desp.rotate_dir;
+	DJ_SetMotorVoltage(ID_GRIP_L_MOTOR, duty);
+	DJ_UpdateCanMotors();
+}
+void Grip_SetTargetCurrent(int16_t new_current)
+{
+	DJ_SetMotorVoltage(ID_GRIP_L_MOTOR, new_current * gGripMotor.motor_desp.rotate_dir);
+	DJ_UpdateCanMotors();
+}
 void Grip_Init(uint8_t index)
 {
-	DJ_Motor_Default(&gGripMotor);
+	Servo_Motor_Default(&gGripMotor);
 	gGripMotor.motor_index = index;
-	gGripMotor.can_id = ID_GRIP_L_MOTOR;
-	gGripMotor.type = DJ_TYPE_2610;
 	gGripMotor.ctrl_mode = MODE_VELOCITY_LOOP;
-	gGripMotor.pids[PID_V].Kp = 10000;
+	gGripMotor.pids[PID_V].Kp = 5000;
 	gGripMotor.pids[PID_V].Ki = 10;
 	gGripMotor.pids[PID_V].errlim = 10000;
+	gGripMotor.pids[PID_P].Kp = 35;
+	gGripMotor.SetPwmFun = Grip_SetPWM;
+	gGripMotor.GetCurrentFun = Grip_GetCurrent;
+	gGripMotor.GetVelocityFun = Grip_GetVelocity;
+	gGripMotor.GetPositionFun = Grip_GetPosition;
 
-	gGripMotor.motor_desp.rotate_dir = -1;
+	gGripMotor.motor_desp.rotate_dir = GRIP_DIR_DEF;
 	gGripMotor.motor_desp.current_max_ma = 3000;
-	gGripMotor.motor_desp.velocity_max_rpm = 10000;
-	gGripMotor.motor_desp.acc_max = 10000;
-	gGripMotor.motor_desp.posotion_positive_max = ((ReadUserSettings(GRIP_POSITIVE_LIMIT)*GRIP_GEAR_RATIO)<<13) - (ReadUserSettings(GRIP_MOVE_SPEED)<<4);
-	gGripMotor.motor_desp.posotion_negative_max = ((ReadUserSettings(GRIP_NEGATIVE_LIMIT)*GRIP_GEAR_RATIO)<<13) + (ReadUserSettings(GRIP_MOVE_SPEED)<<5);
+	gGripMotor.motor_desp.velocity_max_rpm = 15000;
+	gGripMotor.motor_desp.acc_max = 30000;
+	gGripMotor.motor_desp.encoder_resolution = 15;
+	gGripMotor.motor_desp.posotion_positive_max = ((ReadUserSettings(GRIP_POSITIVE_LIMIT) * GRIP_GEAR_RATIO) << 13) / 10;
+	gGripMotor.motor_desp.posotion_negative_max = ((ReadUserSettings(GRIP_NEGATIVE_LIMIT) * GRIP_GEAR_RATIO) << 13) / 10;
 
-	if (DJ_Motor_Init(&gGripMotor))
+	gGrip.state = MODULE_STATE_UNINIT;
+	if (Servo_Motor_Init(&gGripMotor))
 	{
-		DJ_Motor_Enable(&gGripMotor,TRUE);
-		exSetMotorControlWord(&gGripMotor,CLP_OVERLOAD_TIME,200);
+		Servo_Motor_Enable(&gGripMotor, TRUE);
+		exSetMotorControlWord(&gGripMotor, CLP_OVERLOAD_TIME, 200);
 	}
 }
 
 ToolMotorStateDef Grip_GetMotorState(void)
 {
-	return gGripMotorState;
+	return gGrip.motor_state;
 }
 
 uint8_t Grip_GetModuleState(void)
 {
-	 if (gGripState == MODULE_STATE_N_LIM) 
-		 return MODULE_STATE_HOME;
-	 else  if (gGripState == MODULE_STATE_P_LIM) 
+	if (gGrip.state == MODULE_STATE_N_LIM)
+		return MODULE_STATE_HOME;
+	else if (gGrip.state == MODULE_STATE_P_LIM)
 		return MODULE_STATE_MAX;
-	 else
-		 return gGripState;
+	else
+		return gGrip.state;
 }
 
-uint16_t Grip_GetPos(void)
-{
-	return (gGripMotorPos*10/GRIP_GEAR_RATIO)>>14;//返回0.1mm单位的抱紧位置
-}
 //左夹紧电机
 CommandReturn Grip_Control(uint8_t cmd, int8_t data)
 {
 	CommandReturn ret = RT_OK;
 
-	switch(cmd)
+	Servo_Motor_Enable(&gGripMotor, TRUE);
+	switch (cmd)
 	{
 	case MOTOR_CMD_STOP:
-		DJ_Motor_SetTargetVelocity(&gGripMotor,0);
-		gGripMotorState.work_state = WORK_STATE_IDLE;
-		if (gGripState == MODULE_STATE_WORKING || gGripState == MODULE_STATE_HOMING || gGripState == MODULE_STATE_ERROR)
+		Servo_Motor_QuickStop(&gGripMotor);
+		gGrip.motor_state.work_state = WORK_STATE_IDLE;
+		if (gGrip.state == MODULE_STATE_WORKING || gGrip.state == MODULE_STATE_HOMING || gGrip.state == MODULE_STATE_ERROR)
 		{
-			gGripState = MODULE_STATE_NOMAL;
+			gGrip.state = MODULE_STATE_NOMAL;
+			if (gGrip.step == 1)
+			{
+				gGrip.state = MODULE_STATE_UNINIT;
+			}
 		}
 		break;
 	case MOTOR_CMD_CCW:
-		if (gGripMotorState.work_state == WORK_STATE_IDLE/* && gGripState != MODULE_STATE_UNINIT*/)
+		if (gGrip.motor_state.work_state == WORK_STATE_IDLE /* && gGrip.state != MODULE_STATE_UNINIT*/)
 		{
-			DJ_Motor_SetTargetVelocity(&gGripMotor,-ABS(data)*gGripMotor.motor_desp.velocity_max_rpm/100);
+			Servo_Motor_SetTargetVelocity(&gGripMotor, -ABS(data) * gGripMotor.motor_desp.velocity_max_rpm / 100);
 		}
 		else
 			ret = RT_MOTOR_NOT_MANUL;
 		break;
 	case MOTOR_CMD_CW:
-		if (gGripMotorState.work_state == WORK_STATE_IDLE/* && gGripState != MODULE_STATE_UNINIT*/)
+		if (gGrip.motor_state.work_state == WORK_STATE_IDLE /* && gGrip.state != MODULE_STATE_UNINIT*/)
 		{
-			DJ_Motor_SetTargetVelocity(&gGripMotor,ABS(data)*gGripMotor.motor_desp.velocity_max_rpm/100);
+			Servo_Motor_SetTargetVelocity(&gGripMotor, ABS(data) * gGripMotor.motor_desp.velocity_max_rpm / 100);
 		}
 		else
 			ret = RT_MOTOR_NOT_MANUL;
 
 		break;
 	case MOTOR_CMD_WORK:
-		if (gGripMotorState.motion_state == MOTION_STATE_STOPPED)		
+		if (gGrip.motor_state.motion_state == MOTION_STATE_STOPPED)
 		{
-			gGripMotorState.work_state = WORK_STATE_WORK;
-			if (gGripState != MODULE_STATE_MAX && gGripState != MODULE_STATE_P_LIM)
+			gGrip.motor_state.work_state = WORK_STATE_WORK;
+			if (gGrip.state != MODULE_STATE_MAX && gGrip.state != MODULE_STATE_P_LIM)
 			{
-				gReserveTime = ABS(data)*100;			//转换为ms
-				if (gReserveTime > 0)
+				if (data < 5 && data > 0) //太小转不动
+					data = 5;
+				gGrip.aim_pos = ((ABS(data) * GRIP_GEAR_RATIO) << 13) / 10; //0.1mm转换为转换为脉冲数
+				if (gGrip.aim_pos > 0)
 				{
-					DJ_Motor_SetTargetVelocity(&gGripMotor,5000);
-					gReserveflg = 1;//退
+					gGrip.mode = 1; //抱紧结束后退
 				}
 				else
 				{
-					DJ_Motor_SetTargetVelocity(&gGripMotor,(int16_t)ReadUserSettings(GRIP_MOVE_SPEED));
-					gReserveflg = 0;//不退
+					gGrip.mode = 2; //抱紧结束不退
 				}
-				if(gGripState == MODULE_STATE_UNINIT)
+				if (gGrip.state == MODULE_STATE_UNINIT)
 				{
-					DJ_Motor_SetTargetVelocity(&gGripMotor,-10000);					
-					gGripMotorState.work_state = WORK_STATE_HOME;
-					gGripStopFlg = 5;//上电复位后工作
+					gGrip.mode += 5; //上电复位后工作
+					gGrip.step = 1;
+					gGrip.motor_state.work_state = WORK_STATE_HOME;
+					Servo_Motor_SetTargetVelocity(&gGripMotor, -4000);
+				}
+				else
+				{
+					gGrip.step = 11; //正常工作步骤，向最大位置运动
+					Servo_Motor_SetTargetVelocity(&gGripMotor, ReadUserSettings(GRIP_MOVE_SPEED));
 				}
 			}
 			else
@@ -120,303 +168,333 @@ CommandReturn Grip_Control(uint8_t cmd, int8_t data)
 			ret = RT_MOTOR_NOT_STOP;
 		break;
 	case MOTOR_CMD_HOME:
-		if (gGripMotorState.motion_state == MOTION_STATE_STOPPED)		
+		if (gGrip.motor_state.motion_state != MOTION_STATE_STOPPED || gGrip.state == MODULE_STATE_WORKING)
 		{
-			gGripMotorState.work_state = WORK_STATE_HOME;		
-			if(gGripState != MODULE_STATE_HOME && gGripState != MODULE_STATE_N_LIM)
+			ret = RT_MOTOR_NOT_STOP;
+		}
+		else
+		{
+			if (gGrip.state != MODULE_STATE_HOME && gGrip.state != MODULE_STATE_N_LIM)
 			{
-				DJ_Motor_SetTargetVelocity(&gGripMotor,-10000);
-				if (gGripState != MODULE_STATE_UNINIT)
+				if (gGrip.state != MODULE_STATE_UNINIT)
 				{
-					gGripStopFlg = 6;
+					gGrip.mode = 3; //正常复位,向最小位置运动
+					Servo_Motor_SetTargetVelocity(&gGripMotor, -ReadUserSettings(GRIP_MOVE_SPEED));
 				}
 				else
 				{
-					gGripStopFlg = 4;//上电复位
-				}		
+					gGrip.mode = 5; //上电复位
+					gGrip.step = 1;
+					Servo_Motor_SetTargetVelocity(&gGripMotor, -4000);
+				}
 			}
 			else
+			{
 				ret = RT_MOTOR_IS_HOME;
-		}
-		else
-			ret = RT_MOTOR_NOT_STOP;
-		break;
-	case 0x0A:		//抱紧之后退刀
-		if (gGripState == MODULE_STATE_MAX)
-		{
-			DJ_Motor_SetTargetVelocity(&gGripMotor,-2000);
-			gGripState = MODULE_STATE_WORKING;
-			gReserveTime = ABS(data)*100;			//转换为ms
-			gReserveflg = 3;
+			}
+			gGrip.motor_state.work_state = WORK_STATE_HOME;
 		}
 		break;
-	case MOTOR_CMD_UNLOCK:	
-		if (gGripMotorState.work_state == WORK_STATE_IDLE/* && gGripState != MODULE_STATE_UNINIT*/)
+	case 0x0A: //抱紧后退
+		if (gGrip.state == MODULE_STATE_MAX)
 		{
-			gGripState = MODULE_STATE_UNINIT;
-			gGripStopFlg = 7;
-			DJ_Motor_SetTargetVelocity(&gGripMotor,-10000);
+			gGrip.state = MODULE_STATE_WORKING;
+			gGrip.aim_pos = ((ABS(data) * GRIP_GEAR_RATIO) << 13) / 10; 
+			gGrip.aim_pos = gGrip.motor_pos - gGrip.aim_pos;
+			gGrip.step = 13;
+			gGrip.mode = 6; //指令退抱紧
+			Servo_Motor_SetTargetVelocity(&gGripMotor, -2000);
+		}
+		break;
+	case MOTOR_CMD_UNLOCK:
+		if (gGrip.motor_state.work_state == WORK_STATE_IDLE)
+		{
+			if (gGrip.state != MODULE_STATE_UNINIT)
+			{
+				gGrip.motor_state.work_state = WORK_STATE_HOME;
+				gGrip.mode = 11;
+				Servo_Motor_SetTargetVelocity(&gGripMotor, -12000);
+			}
+			else
+				ret = RT_MOTOR_NOT_MANUL;
 		}
 		else
 			ret = RT_MOTOR_NOT_MANUL;
 		break;
 	case MOTOR_CMD_SET:
-		if (gGripMotorState.work_state == WORK_STATE_IDLE)
+		if (gGrip.motor_state.work_state == WORK_STATE_IDLE)
 		{
-			if(data == 0)
-				gGripState = MODULE_STATE_UNINIT;
+			if (data == 0)
+				gGrip.state = MODULE_STATE_UNINIT;
 		}
 		else
 			ret = RT_MOTOR_NOT_MANUL;
 		break;
 	}
-	gGripTim = 0;
-	test_speed=0;
-	test_current = 0;
+	gGrip.timer = 0;
 	return ret;
 }
-
+void Cable_Measuring(void)
+{
+	gCable.diameter = (GRIP_MAX_DISTENCE - gGrip.pos) + 75; //9是经过测量得到的平均误差补偿
+	gCable.cut_gap = ((GRIP_MAX_DISTENCE - gGrip.pos * 2) - gCable.diameter) / 2;
+	if (gCable.cut_gap < 2)
+	{
+		gCable.cut_gap = 0;
+	}
+}
+// int16_t test_currentg[10] = {0};
+// int16_t test_speedg[10] = {0};
+// uint8_t test_step[10] = {0};
+// uint8_t test_mode[10] = {0};
+// uint16_t test_tim[10] = {0};
+// uint8_t test_index = 0;
 void Grip_Update(void)
 {
-	int16_t new_speed = 0;
-	int16_t new_current = 0;
-	static uint8_t flg = 0;
-//	int16_t pos_err = 0;
-//	int16_t work_speed = 0;
+	static uint32_t current_timer = 0;
 
-	new_speed = exGetMotorControlWord(&gGripMotor,VLP_ACTUAL_VAL);
-	new_current = exGetMotorControlWord(&gGripMotor,CLP_CONTINUOUS_VAL);
-	gGripTim += 20;
+	gGrip.pos = Grip_GetPos();
+	gGrip.timer += 20;
 
-if (ABS(test_current) < ABS(new_current))
-{
-	test_current = new_current;
-}
+	if (gGrip.motor_speed > 300)
+	{
+		gGrip.motor_state.motion_state = MOTION_STATE_CW;
+	}
+	else if (gGrip.motor_speed < -300)
+	{
+		gGrip.motor_state.motion_state = MOTION_STATE_CCW;
+	}
+	else if (ABS(gGrip.motor_speed) < 100)
+	{
+		gGrip.motor_state.motion_state = MOTION_STATE_STOPPED;
+	}
 
-	if (new_speed > 500)
+	if (gGrip.motor_state.work_state == WORK_STATE_WORK)
 	{
-		gGripMotorState.motion_state = MOTION_STATE_CW;
-	}
-	else if (new_speed < -500)
-	{
-		gGripMotorState.motion_state = MOTION_STATE_CCW;
-	}
-	else if(ABS(new_speed) < 100)
-	{
-		gGripMotorState.motion_state = MOTION_STATE_STOPPED;
-	}
-	if (gGripState != MODULE_STATE_UNINIT)
-	{
-		gGripMotorPos = exGetMotorControlWord(&gGripMotor,PLP_ACTUAL_VAL)*gGripMotor.motor_desp.rotate_dir;
-		if (gGripMotorPos >= gGripMotor.motor_desp.posotion_positive_max)
+		if (gGrip.motor_state.motion_state == MOTION_STATE_CW && gGrip.mode != 0)
 		{
-			if (gGripMotorState.motion_state == MOTION_STATE_CW)
+			gGrip.state = MODULE_STATE_WORKING;
+		}
+
+		if (gGrip.step == 11) //正常工作过程
+		{
+			if (gGrip.timer > 500)
 			{
-				DJ_Motor_QuickStop(&gGripMotor);
-				gGripStopFlg = 1;
-			}
-			else if(gGripStopFlg == 1)
-			{
-				if (gGripMotorState.motion_state == MOTION_STATE_STOPPED)
+				if (ABS(gGrip.motor_current) >= ReadUserSettings(GRIP_WORK_CURRENT) || (ABS(gGrip.motor_current) >= 1000 && gGrip.mode == 1))
 				{
-					gGripState = MODULE_STATE_P_LIM;	
-					gGripStopFlg = 0;								
+					Servo_Motor_QuickStop(&gGripMotor);
+					gGrip.step = 12;
+					Cable_Measuring();
+				}
+				else if (gGrip.motor_pos >= gGripMotor.motor_desp.posotion_positive_max - 320000)
+				{
+					Servo_Motor_QuickStop(&gGripMotor);
+					gGrip.step = 12;
+					gGrip.mode = 4; //软件正限位
 				}
 			}
 		}
-		else if (gGripMotorPos <= gGripMotor.motor_desp.posotion_negative_max)
+		else if (gGrip.step == 12) //
 		{
-			if (gGripStopFlg == 6)
+			if (gGrip.motor_state.motion_state == MOTION_STATE_STOPPED)
 			{
-				DJ_Motor_QuickStop(&gGripMotor);
-				gGripStopFlg = 2;
-			}
-			else if(gGripStopFlg == 2)
-			{
-				if (gGripMotorState.motion_state == MOTION_STATE_STOPPED)
+				if (gGrip.mode == 1) //抱紧完成后退
 				{
-					gGripState = MODULE_STATE_N_LIM;	
-					gGripStopFlg = 0;								
-				}
-			}
-		}
-		if (gGripMotorState.work_state == WORK_STATE_WORK)
-		{
-			if (gGripMotorState.motion_state == MOTION_STATE_CW)
-			{
-				gGripState = MODULE_STATE_WORKING;
-			}
-			if (gGripState == MODULE_STATE_WORKING)
-			{
-				if (gReserveflg == 0 && gGripTim > 500)
-				{
-					if (ABS(new_current) > ReadUserSettings(GRIP_WORK_CURRENT) || new_speed == 0 || gGripTim > ReadUserSettings(GRIP_MOVE_OVERTIME))
+					if (gCable.diameter > 0)
 					{
-						DJ_Motor_QuickStop(&gGripMotor);
-						gReserveflg = 4;						
+						Servo_Motor_SetTargetVelocity(&gGripMotor, -2000);
+						gGrip.aim_pos = gGrip.motor_pos - gGrip.aim_pos;
+						gGrip.step = 13;
+						gGrip.timer = 0;
 					}
-				}
-				else if (gReserveflg == 1)
-				{
-					if (ABS(new_current) > 800 || new_speed == 0 || gGripTim > 10000)
+					else
 					{
-						DJ_Motor_QuickStop(&gGripMotor);
-						gReserveflg = 2;			
+						gGrip.state = MODULE_STATE_MAX;
+						gGrip.step = 0;
+						gGrip.mode = 0;
 					}
-				}
-				else if (gReserveflg == 2)
-				{
-					if (gGripMotorState.motion_state == MOTION_STATE_STOPPED)
-					{
-						DJ_Motor_SetTargetVelocity(&gGripMotor,-1000);
-						gReserveflg = 3;			
-						gGripTim = 0;
-					}
-				}
-				else if (gReserveflg == 3)
-				{
-					if (gGripMotorState.motion_state == MOTION_STATE_CCW)
-					{
-						if (gGripTim > gReserveTime)	
-						{
-							DJ_Motor_QuickStop(&gGripMotor);
-							gReserveflg = 4;		
-						}	
-					}
-				}
-				else if (gReserveflg == 4)
-				{
-					if (gGripMotorState.motion_state == MOTION_STATE_STOPPED)
-					{
-						gGripState = MODULE_STATE_MAX;
-						gGripTim = 0;
-						gReserveflg = 0;
-					}
-				}
-			}
-		}
-		else if (gGripMotorState.work_state == WORK_STATE_HOME)
-		{
-			if (gGripMotorState.motion_state == MOTION_STATE_CCW && gGripStopFlg != 0)
-			{
-				gGripState = MODULE_STATE_HOMING;
-			}
-			if (flg == 0)
-			{ //用最大力量打开抱紧，在到达复位位置前减速，超时时间为3秒
-				if (gGripStopFlg == 6)
-				{
-					if((gGripMotorPos <= gGripMotor.motor_desp.posotion_negative_max + 600000) || gGripTim > 3000)
-					{
-						DJ_Motor_SetTargetVelocity(&gGripMotor,-4000);
-						gGripTim = 0;
-					}
-				}
-			}				
-			else if (flg == 1)
-			{
-				if (ABS(new_current) > ReadUserSettings(GRIP_HOME_CURRENT)  || new_speed == 0) 
-				{
-					DJ_Motor_QuickStop(&gGripMotor);
-					DJ_SetMotorPos(ID_GRIP_L_MOTOR,0);
-					if (gGripStopFlg == 4) //上电复位
-					{		
-						DJ_Motor_SetTargetVelocity(&gGripMotor,3000);//复位回退	
-						flg = 2;	
-					}
-					else if (gGripStopFlg == 5) //上电先复位后工作
-					{		
-						flg = 3;
-					}
-					else if (gGripStopFlg == 6) //正常复位
-					{		
-						flg = 4;
-					}
-					gGripTim = 0;
-				}						
-				if (gGripTim > ReadUserSettings(GRIP_MOVE_OVERTIME) + 20000000/ABS(new_speed))
-				{
-					DJ_Motor_QuickStop(&gGripMotor);
-					gGripMotorState.work_state = WORK_STATE_IDLE;
-					gGripState = MODULE_STATE_ERROR;
-				}
-			}
-			else if(flg == 3)//先复位后工作
-			{
-				if(gGripTim > 500 || gGripMotorState.motion_state == MOTION_STATE_STOPPED)
-				{
-					DJ_Motor_SetTargetVelocity(&gGripMotor,5000);//工作
-					gGripMotorState.work_state = WORK_STATE_WORK;
-					flg = 0;
-				}
-			}
-			else if(flg == 2)//上电复位回退300ms
-			{
-				if (gGripTim > 300)
-				{				
-					DJ_Motor_QuickStop(&gGripMotor);
-					flg = 4;
-				}								
-			}
-			else if(flg == 4)//等待完全停止
-			{
-				if (gGripMotorState.motion_state == MOTION_STATE_STOPPED)
-				{
-					gGripState = MODULE_STATE_HOME;
-					gGripStopFlg = 0;
-					flg = 0;							
-				}
-			}
-		}
-		else
-		{
-			gGripStopFlg = 0;
-			flg = 0;
-		}
-	}
-	else
-	{		
-		if (gGripStopFlg != 0)
-		{
-			if (gGripStopFlg == 7)
-			{//强制解锁不限制电流，确保能够打开，但是开机发送解锁命令可能导致电机憋死
-				if (new_speed > 1000)//憋死后正转
-				{
-					gGripMotorState.work_state = WORK_STATE_HOME;
-					gGripState = MODULE_STATE_HOMING;
-					gGripTim = 0;
-					flg = 2;
 				}
 				else
 				{
-					if(new_speed < -7000 || gGripTim > 1000)
+					if (gGrip.mode == 4)
 					{
-						DJ_Motor_SetTargetVelocity(&gGripMotor,-2000);
-						gGripMotorState.work_state = WORK_STATE_HOME;
-						gGripState = MODULE_STATE_HOMING;
-						gGripStopFlg = 4;
-						gGripTim = 0;
-						flg = 1;
-						test_speed = new_speed;
+						gGrip.state = MODULE_STATE_P_LIM;
+						gGrip.step = 0;
 					}
+					else if (gGrip.mode == 2) //抱紧完不后退
+					{
+						gGrip.state = MODULE_STATE_MAX;
+						gGrip.step = 0;
+					}
+					else if (gGrip.mode == 6) //指令退抱紧
+					{
+						gGrip.state = MODULE_STATE_POS_REACH;
+						gGrip.step = 0;
+					}
+					gGrip.mode = 0;
 				}
 			}
-			else
-			{//复位命令或工作命令对电流进行限制，但是开机时如果处于抱紧状态可能导致复位失败
-				if(ABS(new_speed) > 3000 || gGripTim > 1000 || ABS(new_current) > 1500)
+		}
+		else if (gGrip.step == 13) //
+		{
+			if (gGrip.motor_pos <= gGrip.aim_pos + 10000)
+			{
+				Servo_Motor_QuickStop(&gGripMotor);
+				gGrip.step = 12;
+				if (gGrip.mode == 1)//抱紧完后退
 				{
-					DJ_Motor_SetTargetVelocity(&gGripMotor,-2000);
-					gGripMotorState.work_state = WORK_STATE_HOME;
-					gGripState = MODULE_STATE_HOMING;
-					gGripTim = 0;
-					flg = 1;
-					test_speed = new_speed;
+					gGrip.mode = 2;
+				}
+			}
+			else if (gGrip.timer > 5000) //退不动
+			{
+				Servo_Motor_QuickStop(&gGripMotor);
+				gGrip.state = MODULE_STATE_ERROR;
+			}
+		}
+	}
+	else if (gGrip.motor_state.work_state == WORK_STATE_HOME)
+	{
+		if (gGrip.motor_state.motion_state == MOTION_STATE_CCW && gGrip.mode != 0) //防止外部拧动产生状态错误
+		{
+			gGrip.state = MODULE_STATE_HOMING;
+		}
+
+		if (gGrip.step == 0) //正常复位
+		{
+			if (gGrip.mode == 3) //正常位置控制复位
+			{
+				if (gGrip.motor_pos <= gGripMotor.motor_desp.posotion_negative_max + 320000)
+				{
+					Servo_Motor_QuickStop(&gGripMotor);
+					gGrip.step = 4;
+				}
+			}
+			else if (gGrip.mode == 11) //强制解锁
+			{
+				if (ABS(gGrip.motor_speed) > 10000)
+				{
+					Servo_Motor_SetTargetVelocity(&gGripMotor, -ReadUserSettings(GRIP_MOVE_SPEED));
+					gGrip.mode = 5; //上电复位
+					gGrip.step = 5;
+				}
+			}
+		}
+		else if (gGrip.step == 1) //上电复位
+		{
+			if (ABS(gGrip.motor_current) >= ReadUserSettings(GRIP_HOME_CURRENT) && gGrip.timer > 500)
+			{
+				Servo_Motor_QuickStop(&gGripMotor);
+				gGrip.step = 2;
+			}
+		}
+		else if (gGrip.step == 2)
+		{
+			if (gGrip.motor_state.motion_state == MOTION_STATE_STOPPED)
+			{
+				DJ_SetMotorPos(ID_GRIP_L_MOTOR, 0);
+				if (gGrip.mode == 5) //上电复位
+				{
+					gGrip.step = 3;
+					Servo_Motor_SetTargetVelocity(&gGripMotor, 2000);
+				}
+				else if (gGrip.mode > 5) //复位后工作
+				{
+					gGrip.mode -= 5;
+					gGrip.step = 11;
+					gGrip.timer = 0;
+					gGrip.motor_state.work_state = WORK_STATE_WORK;
+					Servo_Motor_SetTargetVelocity(&gGripMotor, ReadUserSettings(GRIP_MOVE_SPEED));
+				}
+			}
+		}
+		else if (gGrip.step == 3)
+		{
+			if (gGrip.motor_pos >= gGripMotor.motor_desp.posotion_negative_max - 10000)
+			{
+				Servo_Motor_QuickStop(&gGripMotor);
+				gGrip.step = 4;
+			}
+		}
+		else if (gGrip.step == 4)
+		{
+			if (gGrip.motor_state.motion_state == MOTION_STATE_STOPPED)
+			{
+				gGrip.state = MODULE_STATE_N_LIM;
+				gGrip.mode = 0;
+				gGrip.step = 0;
+			}
+		}
+		else if (gGrip.step == 5) //强制解锁
+		{
+			if (ABS(gGrip.motor_current) >= ReadUserSettings(GRIP_HOME_CURRENT) && gGrip.timer > 500)
+			{
+				Servo_Motor_QuickStop(&gGripMotor);
+				if (gGrip.motor_pos <= gGripMotor.motor_desp.posotion_negative_max + 320000)
+				{
+					gGrip.step = 2;
+				}
+				else
+				{
+					gGrip.state = MODULE_STATE_ERROR;
+					gGrip.step = 0;
+					gGrip.mode = 0;
 				}
 			}
 		}
 	}
-	//过流保护
-	if (ABS(new_current) > gGripMotor.motor_desp.current_max_ma  && gGripTim > 1000)
+	else
 	{
-		DJ_Motor_QuickStop(&gGripMotor);
+		if (gGrip.motor_speed == 0)
+		{
+			gGrip.mode = 10;
+			gGrip.step = 0;
+			Servo_Motor_Enable(&gGripMotor,FALSE);
+		}
+	}
+	// if (test_step[test_index] != gGrip.step)
+	// {
+	// 	test_index++;
+	// 	test_step[test_index] = gGrip.step;
+	// 	test_mode[test_index] = gGrip.mode;
+	// 	test_speedg[test_index] = gGrip.motor_speed;
+	// 	test_currentg[test_index] = gGrip.motor_current;
+	// 	test_tim[test_index] = gGrip.timer;
+	// 	if (gGrip.step == 0)
+	// 	{
+	// 		while (test_index < 9)
+	// 		{
+	// 			test_index++;
+	// 			test_step[test_index] = 0;
+	// 			test_mode[test_index] = 0;
+	// 			test_speedg[test_index] = 0;
+	// 			test_currentg[test_index] = 0;
+	// 			test_currentg[test_index] = 0;
+	// 		}
+
+	// 		test_index = 0;
+	// 	}
+	// }
+	if(ABS(gGrip.motor_current) >= 200)
+	{
+		if (ABS(gGrip.motor_speed) <= 20)
+		{
+			current_timer += 20;
+			if (current_timer > 3000) //连续3秒电流速度为0 电流不为0报错
+			{
+				gGrip.mode = 0;
+				gGrip.step = 0;
+				Servo_Motor_QuickStop(&gGripMotor);
+				gGrip.state = MODULE_STATE_ERROR;
+			}
+		}
+		else if (ABS(gGrip.motor_speed) >= 200)
+		{
+			current_timer = 0;
+		}
+	}
+	else if (ABS(gGrip.motor_current) <= 20)
+	{
+		current_timer = 0;
 	}
 }

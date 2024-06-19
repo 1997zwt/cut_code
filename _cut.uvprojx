@@ -443,6 +443,11 @@
               <FileType>1</FileType>
               <FilePath>.\drv\PID.c</FilePath>
             </File>
+            <File>
+              <FileName>servo_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\servo_motor.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1118,6 +1123,11 @@
               <FileName>PID.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\drv\PID.c</FilePath>
+            </File>
+            <File>
+              <FileName>servo_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\servo_motor.c</FilePath>
             </File>
           </Files>
         </Group>
