@@ -3,8 +3,7 @@
 #include "lidischarge.h"
 #include "stdio.h"
 
-#define SOFT_VERSION	4222
-#define SOFT_DATE		20240614
+
 
 #define SetPowerOn()		   POWON_GPIO_PORT->BSRR = POWON_GPIO_PIN;  //开机
 #define SetPowerOff()		    POWON_GPIO_PORT->BRR = POWON_GPIO_PIN;   //关机
@@ -717,9 +716,9 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 			{
 				if (cmd != MOTOR_CMD_STOP)
 				{
-					rt = RT_TOOL_WORKING;
-					CutTool_CommandReply(motor,cmd,rt);
-					return;
+				rt = RT_TOOL_WORKING;
+				CutTool_CommandReply(motor,cmd,rt);
+				return;
 				}
 			}
 	//		tool_state = TOOL_STATE_MANUL;
@@ -787,9 +786,30 @@ void Task_Tool(void *p_arg)
 			this_current = CutMotor_GetCurrent();
 			if (cut_step == 0)//开始断线
 			{
+				if(!IsHomeSensorOn())
+				{
+					Steering_Motor_Move(&cut_motor,7500);
+					cut_step = 6;	
+				}else{
 				Steering_Motor_Move(&cut_motor,0);			
-				cut_step = 1;		
+				cut_step = 1;	
+				}
 				tm_cut_1 = 0;
+			}else if(cut_step == 6)
+			{
+				if(IsHomeSensorOn())
+				{
+					tm_cut_1 = 0;
+					cut_step=7;
+				}
+			}else if(cut_step == 7)
+			{
+				if(tm_cut_1>=1200)
+				{
+					Steering_Motor_Move(&cut_motor,0);			
+					cut_step = 1;	
+					tm_cut_1 = 0;
+				}
 			}
 			else if (cut_step == 1)
 			{				

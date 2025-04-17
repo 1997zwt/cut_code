@@ -29,8 +29,8 @@ void InitUserSettings(uint8_t flg)
 			gUserSettings[i]=0;
 		}
 		
-		gUserSettings[VER_SOFT] = 4222;//3.01
-		gUserSettings[VER_SOFT_DATE] = 20240614;//2020.6.2
+		gUserSettings[VER_SOFT] = SOFT_VERSION;//3.01
+		gUserSettings[VER_SOFT_DATE] = SOFT_DATE;//2020.6.2
 		gUserSettings[VER_SETTINGS] = 301;//
 		gUserSettings[VER_SETTINGS_DATE] = 20200604;//
 		gUserSettings[VER_MODIFY_TIMES] = 0;
