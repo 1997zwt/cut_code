@@ -23,6 +23,8 @@ int32_t gWorkTimes = 0;
 uint8_t cut_start_position = 100;
 uint16_t gCutPauseTm=0;//切刀从工作到暂停的时间限制
 
+ToolFaultCode faultcode=FAULT_CODE_NONE;
+
 extern stGripDef gGrip;
 
 OS_EVENT* USART_MUTEX;  //串口互斥量 
@@ -38,21 +40,22 @@ uint8_t GetBattaryQuantity(void)
 
 void CutTool_SendState(void)    //状态反馈
 {
-	uint8_t buf[20] = {0xAA,0x55,0x09,TOOL_TYPE_CUT,0x03,MOTOR_CMD_REPORT,0x00};
+	uint8_t buf[20] = {0xAA,0x55,0x0a,TOOL_TYPE_CUT,0x03,MOTOR_CMD_REPORT,0x00};
 
 	if (OSMutexAccept(USART_MUTEX,&m_err))
 	{
 		buf[6] = GetBattaryQuantity();
 		buf[7] = tool_state;
-		buf[8] = gSensorState + (gCameraState << 6);
-		buf[9] = cut_motor_state.motion_state + (cut_motor_state.work_state<<2) + (gCutModuleState<<4);
+		buf[8] = faultcode;
+		buf[9] = gSensorState + (gCameraState << 6);
+		buf[10] = cut_motor_state.motion_state + (cut_motor_state.work_state<<2) + (gCutModuleState<<4);
 		
 		grip_motor_state = Grip_GetMotorState();
 		
-		buf[10] = grip_motor_state.motion_state+ (grip_motor_state.work_state<<2) + (gGripModuleState<<4);
+		buf[11] = grip_motor_state.motion_state+ (grip_motor_state.work_state<<2) + (gGripModuleState<<4);
 
-		buf[11] = buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8] + buf[9] + buf[10];
-		UART_SendBuf(TOOL_CONTROL_PORT,buf,12);
+		buf[12] = buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8] + buf[9] + buf[10]+buf[11];
+		UART_SendBuf(TOOL_CONTROL_PORT,buf,13);
 		OSMutexPost(USART_MUTEX);	
 	}
 }
@@ -801,6 +804,12 @@ void Task_Tool(void *p_arg)
 				{
 					tm_cut_1 = 0;
 					cut_step=7;
+				}else if(tm_cut_1>=15000)
+				{
+					Steering_Motor_Move(&cut_motor,0);
+					tm_cut_1=0;
+					tool_state = TOOL_STATE_FAILURE;
+					faultcode = FAULT_HOMESENSOR;
 				}
 			}else if(cut_step == 7)
 			{
@@ -891,6 +900,7 @@ void Task_Tool(void *p_arg)
 				if (cut_motor_state.motion_state == MOTION_STATE_STOPPED)
 				{
 					tool_state = TOOL_STATE_FAILURE;
+					faultcode = FAULT_CUTWOKE;
 					cut_step =0;
 				}
 			}

@@ -13,6 +13,7 @@
 #define _GRIP_H
 
 #include "../user_tasks.h"
+extern ToolFaultCode faultcode;
 
 typedef struct 
 {

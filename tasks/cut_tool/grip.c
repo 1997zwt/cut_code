@@ -350,6 +350,7 @@ void Grip_Update(void)
 			{
 				Servo_Motor_QuickStop(&gGripMotor);
 				gGrip.state = MODULE_STATE_ERROR;
+				faultcode = FAULT_GRIPBACK;
 			}
 		}
 	}
@@ -437,6 +438,7 @@ void Grip_Update(void)
 				else
 				{
 					gGrip.state = MODULE_STATE_ERROR;
+					faultcode = FAULT_UNLOCK;
 					gGrip.step = 0;
 					gGrip.mode = 0;
 				}
@@ -486,6 +488,7 @@ void Grip_Update(void)
 				gGrip.step = 0;
 				Servo_Motor_QuickStop(&gGripMotor);
 				gGrip.state = MODULE_STATE_ERROR;
+				faultcode = FAULT_GRIPSTOP;
 			}
 		}
 		else if (ABS(gGrip.motor_speed) >= 200)

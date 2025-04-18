@@ -154,6 +154,16 @@ typedef enum
 	TOOL_STATE_MIDDLE_1
 }ToolStateDef;
 
+typedef enum
+{
+	FAULT_CODE_NONE,
+	FAULT_GRIPBACK, //抱紧后退失败
+	FAULT_UNLOCK,   //抱紧强制解锁失败
+	FAULT_GRIPSTOP,	//抱紧电机憋死
+	FAULT_HOMESENSOR,
+	FAULT_CUTWOKE, //超时失败
+}ToolFaultCode;
+
 
 typedef enum
 {
