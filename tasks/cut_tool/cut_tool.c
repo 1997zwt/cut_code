@@ -11,7 +11,7 @@
 #define IsWorkSensorOn()		(!(SENSOR1_GPIO_PORT->IDR & (SENSOR1_GPIO_PIN)))
 #define IsHomeSensorOn()		(!(SENSOR2_GPIO_PORT->IDR & (SENSOR2_GPIO_PIN)))
 #define isPowerButtonDown()		(!(POWIN_GPIO_PORT->IDR & POWIN_GPIO_PIN))
-
+u32 hometim = 0;
 OS_STK tool_task_stk[TOOL_TASK_STK_SIZE];
 ToolStateDef tool_state = TOOL_STATE_MANUL;
 static stSteeringMotorDef cut_motor;
@@ -631,6 +631,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 				{
 					Grip_Control(MOTOR_CMD_HOME,0);
 					CutMotorControl(MOTOR_CMD_HOME,0);
+					hometim=0;
 					tool_state = TOOL_STATE_HOMING;
 				}
 				else
@@ -664,12 +665,13 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 					rt = RT_TOOL_LOW_BAT;
 				break;
 			case TOOL_CMD_UNLOCK:
-                if (tool_state == TOOL_STATE_MANUL)
-                {
-					Grip_Control(MOTOR_CMD_UNLOCK,0);
-					tool_state = TOOL_STATE_UNLOCKING;
-                }
-                else
+					if (tool_state == TOOL_STATE_MANUL)
+					{
+						hometim=0;
+		Grip_Control(MOTOR_CMD_UNLOCK,0);
+		tool_state = TOOL_STATE_UNLOCKING;
+					}
+          else
 					rt = RT_TOOL_NOT_MANUL;
 				break;
 			case TOOL_CMD_RESET://复位电机状态
@@ -918,7 +920,7 @@ void Task_Tool(void *p_arg)
 			tm_cut_2 += 20;		
 			if (tm_cut_2 > 30000)//解锁30s超时失败
 			{
-				tool_state = TOOL_STATE_FAILURE;
+				tool_state = TOOL_STAT_UNLOCKFAILURE;
 				tm_cut_2 = 0;
 			}
 			else
@@ -954,11 +956,18 @@ void Task_Tool(void *p_arg)
 			}
 		}
 		
-		if(tool_state == TOOL_STATE_HOMING||tool_state == TOOL_STATE_UNLOCKING)
+		if(tool_state == TOOL_STATE_HOMING)
 		{
 			if(gGripModuleState==MODULE_STATE_ERROR)
 			{
 				tool_state=TOOL_STATE_HOMEFAILURE;
+			}
+		}
+		if(tool_state == TOOL_STATE_UNLOCKING)
+		{
+			if(gGripModuleState==MODULE_STATE_ERROR)
+			{
+				tool_state=TOOL_STAT_UNLOCKFAILURE;
 			}
 		}
 
@@ -1000,6 +1009,18 @@ void Task_Tool(void *p_arg)
 		else
 		{			
 			gSensorState = 0;
+			if(tool_state == TOOL_STATE_HOMING)
+			{
+				if(hometim<15000)
+				{
+					hometim +=20;
+				}else{
+					Steering_Motor_Move(&cut_motor,0);
+				tool_state = TOOL_STATE_HOMEFAILURE;
+				faultcode = FAULT_HOMESENSOR;
+					hometim=0;
+				}
+			}
 		}
 
 		if(cut_motor_state.work_state == WORK_STATE_WORK)

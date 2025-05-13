@@ -27,6 +27,8 @@
 #include "../user_define.h"
 #include "grip.h" 
 
+extern ToolFaultCode faultcode;
+
 #define CAMERA_GPIO_PORT    	GPIOA			              /* GPIO¶Ë¿Ú */
 #define CAMERA_GPIO_CLK 	    RCC_APB2Periph_GPIOA		/* GPIO¶Ë¿ÚÊ±ÖÓ */
 #define CAMERA_GPIO_PIN		    GPIO_Pin_2		

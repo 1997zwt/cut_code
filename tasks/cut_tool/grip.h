@@ -13,7 +13,6 @@
 #define _GRIP_H
 
 #include "../user_tasks.h"
-extern ToolFaultCode faultcode;
 
 typedef struct 
 {
@@ -47,7 +46,6 @@ void Grip_Update(void);
 int32_t Grip_GetPos(void);
 uint8_t Grip_GetModuleState(void);
 stCableDef* GetCableInfo(void);
-
 
 #endif
 /******************* (C) COPYRIGHT 2020 REAPDARO *****END OF FILE****/

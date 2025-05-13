@@ -75,5 +75,6 @@ int32_t DJ_GetMotorAngle(uint8_t moto_id);
 int32_t DJ_GetMotorSpeed(uint8_t moto_id);
 int16_t DJ_GetMotorCurrent(uint8_t moto_id);
 void DJ_UpdateCanMotors(void);
+int16_t DJ_GetMsgCounts(uint8_t moto_id);
 #endif
 

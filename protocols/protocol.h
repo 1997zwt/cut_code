@@ -150,6 +150,7 @@ typedef enum
 	TOOL_STATE_UNLOCKING,	//解锁中13
 	TOOL_STATE_UNLOCKED,	//解锁成功14
 	TOOL_STATE_HOMEFAILURE,
+	TOOL_STAT_UNLOCKFAILURE,
 	TOOL_STATE_MIDDLE_0=100,	//中间自定义状态
 	TOOL_STATE_MIDDLE_1
 }ToolStateDef;
@@ -157,11 +158,12 @@ typedef enum
 typedef enum
 {
 	FAULT_CODE_NONE,
-	FAULT_GRIPBACK, //抱紧后退失败
-	FAULT_UNLOCK,   //抱紧强制解锁失败
-	FAULT_GRIPSTOP,	//抱紧电机憋死
-	FAULT_HOMESENSOR,
-	FAULT_CUTWOKE, //超时失败
+	FAULT_HOMESENSOR,//复位传感器故障
+	FAULT_CUTWOKE, //工作超时失败
+	err_grip_overcurrent=8,
+	err_grip_unlock_fail,
+	err_zkgrip_disconnect,
+	ERR_NOT_SET_TIME=34,
 }ToolFaultCode;
 
 

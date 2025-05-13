@@ -216,6 +216,10 @@ int16_t DJ_GetMotorCurrent(uint8_t moto_id)
 {
 	return gMotors[moto_id-1].real_current;
 }
+int16_t DJ_GetMsgCounts(uint8_t moto_id)
+{
+	return gMotors[moto_id - 1].msg_cnt;
+}
 void DJ_UpdateCanMotors(void)
 {
 	uint8_t tx_data[8] = {0};
