@@ -104,33 +104,12 @@ typedef union
 #define BYTE1(x)		(unsigned char)((x)>>8)				//获取第2个字节
 #define BYTE2(x)		(unsigned char)((x)>>16)				//获取第3个字节
 #define BYTE3(x)		(unsigned char)((x)>>24)				//获取第4个字节
-__inline uint32_t CombineU32_LF(uint8_t* data)
-{
-	return (data[0] + ((uint32_t)data[1]<<8) + ((uint32_t)data[2]<<16) + ((uint32_t)data[3]<<24));
-}
-__inline uint32_t CombineU32_HF(uint8_t* data)
-{
-	return (data[3] + ((uint32_t)data[2]<<8) + ((uint32_t)data[1]<<16) + ((uint32_t)data[0]<<24));
-}
+
 #endif
 
 #define SYSCLK_FREQ  72000000
 #define TIMEOUT_1US	 (SYSCLK_FREQ/1000000)
 #define TIMEOUT_1MS	 (SYSCLK_FREQ/1000)
-
-//经测试延时1us时实际为1.174us
-//误差为17.4%
-__inline void  delay_us(uint32_t us)
-{
-	us = us<<3;
-	while(us--);
-}		
-//经测试延时1ms时误差几乎为0
-__inline void  delay_ms(uint16_t ms)
-{
-	while(ms--)
-		delay_us(1000);
-}		
 
 #endif
 

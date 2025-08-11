@@ -52,8 +52,10 @@ void InitUserSettings(uint8_t flg)
 		gUserSettings[GRIP_HOME_CURRENT] = 1000;  //500第一次复位的时候用电流
 		gUserSettings[GRIP_MOVE_OVERTIME] = 7000;
 		gUserSettings[GRIP_POSITIVE_LIMIT] = 300;  //没线的时候用的是位置限位
-		gUserSettings[GRIP_NEGATIVE_LIMIT] = 0;  //有线的时候用的是位置限位
-
+		gUserSettings[GRIP_NEGATIVE_LIMIT] = 5;  //有线的时候用的是位置限位
+		
+		gUserSettings[CUT_DETECT_TIME_1]=3500;
+		gUserSettings[CUT_DETECT_MAXRATIO]=13;
 #endif
 #ifdef _STRIP_TOOL_H
 		gUserSettings[SYS_FLGS] = ((TOOL_TYPE_STRIP|TOOL_OPERATE_TYPE)<<24);
@@ -101,17 +103,20 @@ void InitUserSettings(uint8_t flg)
 #ifdef USE_PROTOCOL_V3
 		gUserSettings[SYS_FLGS] |= (3<<16);
 #endif
-	gUserSettings[VER_DEVICE_ID] = iapUserSettings[IAP_VER_DEVICE_ID];
+//	gUserSettings[VER_DEVICE_ID] = iapUserSettings[IAP_VER_DEVICE_ID];
+//	gUserSettings[WORK_TIMES] = iapUserSettings[IAP_WORK_TIMES];
 	gUserSettings[WORK_TIMES] = iapUserSettings[IAP_WORK_TIMES];
+	gWorkTimes = ReadUserSettings(WORK_TIMES);
 	if(gUserSettings[VER_DEVICE_ID]==-1 || gUserSettings[WORK_TIMES]==-1)
 	{
-		gUserSettings[VER_DEVICE_ID]=0;
-		gUserSettings[WORK_TIMES] = 0;
+//		gUserSettings[VER_DEVICE_ID]=0;
+//		gUserSettings[WORK_TIMES] = 0;
 	}
 	
 	}
 		
-	gUserSettings[POWER_LOW_LIMIT] = 10;		
+	gUserSettings[POWER_LOW_LIMIT] = 10;	
+
 	if(gUserSettings[VER_MODIFY_TIMES] == 0)
 	{
 		SaveUserSettings();
@@ -122,6 +127,7 @@ void WriteUserSettings(uint8_t addr, int32_t val)
 {
 	gUserSettings[addr] = val;
 }
+
 
 //接口函数
 int32_t ReadUserSettings(uint8_t addr)
@@ -142,7 +148,15 @@ void SaveUserSettings(void)
 		gUserSettings[USER_SETTING_CHECK] += gUserSettings[i];
 	}
 
+	#ifdef	USE_FLASH
 	DRV_FLASH_Write(USER_FLASH_SAVE_BASE, (uint16_t*)gUserSettings, USER_SETTING_SIZE*2);
+	#endif
+	#ifdef USE_I2C_EEPROM
+	IIC_Write_nByte(USER_EEPROM_SAVE_BASE,(uint8_t *)gUserSettings, USER_SETTING_SIZE * 4);
+	#endif
+	#ifdef USE_SPI_FRAM
+	Fram_WriteData(USER_SET_SAVE_BASE,(uint8_t*)gUserSettings, 4*USER_SETTING_SIZE);
+	#endif
 }
 
 bool LoadUserSettings(void)
@@ -150,7 +164,15 @@ bool LoadUserSettings(void)
 	uint8_t i=0;
 	int32_t check = 0;
 
+			#ifdef	USE_FLASH
 	DRV_FLASH_Read(USER_FLASH_SAVE_BASE, (uint16_t*)gUserSettings, USER_SETTING_SIZE*2);
+#endif
+#ifdef	USE_I2C_EEPROM
+	IIC_ReadByte(USER_EEPROM_SAVE_BASE, (uint8_t *)gUserSettings, USER_SETTING_SIZE * 4);
+#endif
+#ifdef	USE_SPI_FRAM
+		Fram_ReadData(USER_SET_SAVE_BASE,(uint8_t*)gUserSettings, 4*USER_SETTING_SIZE);
+#endif
 
 	if (!TSB(gUserSettings[SYS_FLGS],FLG_SAVE)) return FALSE;// 测试对应位是否1
 

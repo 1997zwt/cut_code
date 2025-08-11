@@ -275,7 +275,7 @@
               </OCR_RVCT3>
               <OCR_RVCT4>
                 <Type>1</Type>
-                <StartAddress>0x8003000</StartAddress>
+                <StartAddress>0x8000000</StartAddress>
                 <Size>0x20000</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
@@ -325,7 +325,7 @@
             <wLevel>2</wLevel>
             <uThumb>0</uThumb>
             <uSurpInc>0</uSurpInc>
-            <uC99>0</uC99>
+            <uC99>1</uC99>
             <uGnu>0</uGnu>
             <useXO>0</useXO>
             <v6Lang>0</v6Lang>
@@ -337,7 +337,7 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>USE_STDPERIPH_DRIVER,STM32F10X_MD,USE_BOOTLOADER</Define>
+              <Define>USE_STDPERIPH_DRIVER,STM32F10X_MD</Define>
               <Undefine></Undefine>
               <IncludePath>..\CMSIS;..\StdPeriph_Driver\inc;..\uCOS-II\Ports;..\uCOS-II\Source;..\duanxianV4.2;..\FreeModbus\modbus\include;..\FreeModbus\modbus\ascii;..\FreeModbus\modbus\functions;..\FreeModbus\modbus\rtu;..\FreeModbus\modbus\tcp;..\FreeModbus\port;.\tasks\cut_tool;.\drv;..\robot-disconnection-tool;.\tasks</IncludePath>
             </VariousControls>
@@ -448,6 +448,21 @@
               <FileType>1</FileType>
               <FilePath>.\drv\servo_motor.c</FilePath>
             </File>
+            <File>
+              <FileName>drv_spifram.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\drv_spifram.c</FilePath>
+            </File>
+            <File>
+              <FileName>st_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\st_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_norflash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\drv_norflash.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -492,6 +507,11 @@
               <FileName>lidischarge.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\tasks\lidischarge.c</FilePath>
+            </File>
+            <File>
+              <FileName>log.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\tasks\log.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -1011,7 +1031,7 @@
             <wLevel>2</wLevel>
             <uThumb>0</uThumb>
             <uSurpInc>0</uSurpInc>
-            <uC99>0</uC99>
+            <uC99>1</uC99>
             <uGnu>0</uGnu>
             <useXO>0</useXO>
             <v6Lang>0</v6Lang>
@@ -1134,6 +1154,21 @@
               <FileType>1</FileType>
               <FilePath>.\drv\servo_motor.c</FilePath>
             </File>
+            <File>
+              <FileName>drv_spifram.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\drv_spifram.c</FilePath>
+            </File>
+            <File>
+              <FileName>st_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\st_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_norflash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drv\drv_norflash.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1178,6 +1213,11 @@
               <FileName>lidischarge.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\tasks\lidischarge.c</FilePath>
+            </File>
+            <File>
+              <FileName>log.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\tasks\log.c</FilePath>
             </File>
           </Files>
         </Group>

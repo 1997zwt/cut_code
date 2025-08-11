@@ -57,12 +57,12 @@ void NMI_Handler(void)
   * @param  None
   * @retval None
   */
-void HardFault_Handler(void)
-{
-	while (1)
-  {
-  }
-}
+//void HardFault_Handler(void)
+//{
+//	while (1)
+//  {
+//  }
+//}
 
 /**
   * @brief  This function handles Memory Manage exception.

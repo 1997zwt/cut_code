@@ -38,6 +38,8 @@ typedef enum
 	TOOL_TYPE_SETTINGS=0xFF
 }ToolTypeDef;
 
+#define TOOL_TYPE TOOL_TYPE_CUT
+
 //定义工具电机编号，最多支持8个电机
 //建议在工具头文件中重定义
 typedef enum
@@ -154,6 +156,14 @@ typedef enum
 	TOOL_STATE_MIDDLE_0=100,	//中间自定义状态
 	TOOL_STATE_MIDDLE_1
 }ToolStateDef;
+
+typedef enum
+{
+	TOOL_MOD,
+	SCREW_MOD,
+	HOMESENSOR_MOD,
+	GRIP_MOD,
+}Module_Code;
 
 typedef enum
 {

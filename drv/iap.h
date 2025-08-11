@@ -3,19 +3,28 @@
 
 #include "stm32f10x.h"
 #include "drv_flash.h"
+#include "user_settings.h"
 #include <string.h>
 
 //IAP用工具类型
 #define IAP_TOOL_NUM		0x01
 
 /* Define if use bkp save flag  -------------------------------*/
-#define USE_BKP_SAVE_FLAG     0
-
-#if (USE_BKP_SAVE_FLAG == 1)
-  #define INIT_FLAG_DATA      0x0000  //默认标志的数据(空片子的情况)
-#else
-  #define INIT_FLAG_DATA      0xFFFF   //默认标志的数据(空片子的情况)
+#if defined(USE_FLASH)
+#include "drv_flash.h"
+#define INIT_FLAG_DATA 0xFFFF									//默认标志的数据(空片子的情况)
+#define IAP_FLAG_ADDR (uint32_t)(ApplicationAddress - 1024 * 2) //App区域和Bootloader区域共享信息的地址(暂定大小为2K)
+#define IAP_FLAG_ADDR_NEW   (uint32_t)(ApplicationAddress - 1024 * 2 + 1024)
+#elif defined(USE_I2C_EEPROM)
+#include "ucos_ii.h"
+#include "f_ram.h"
+#define INIT_FLAG_DATA 0x0000
+#define IAP_FLAG_ADDR  0
+#define STM32_FLASH_BASE 0x08000000
+#elif defined(USE_SPI_FRAM)
+#define INIT_FLAG_DATA      0xFFFF
 #endif
+
 #define UPDATE_FLAG_DATA      0xEEEE   //下载标志的数据
 #define UPLOAD_FLAG_DATA      0xDDDD   //上传标志的数据
 #define ERASE_FLAG_DATA       0xCCCC   //擦除标志的数据
@@ -31,17 +40,17 @@
 /* IAP 中保存的参数------------------------------------------------ */
 
 #define IAP_SETTING_SIZE	100
-typedef enum
-{
-	SKIP,
-	IAP_VER_DEVICE_ID,
-	IAP_WORK_TIMES,
-	IAP_JUMPFUN_ADDR = 90, 	//IAP跳转
-	FINISH_FLAG_ADDR,			//程序写入完整
-	FINISH_RUNNING_ADDR,	//程序运行成功
-	POWERON_ADDR,					//开关机标志位
-	POWEROFISOK						//正常关机标志位						
-}iapUserSettingsDef;
+	typedef enum { SKIP,
+				   IAP_VER_DEVICE_ID,
+				   IAP_WORK_TIMES,
+					IAP_WIRING_CW_STOP,
+          IAP_WIRING_CCW_STOP,
+				   IAP_JUMPFUN_ADDR = 90, //IAP跳转
+				   FINISH_FLAG_ADDR,	  //程序写入完整
+				   FINISH_RUNNING_ADDR,	  //程序运行成功
+				   POWERON_ADDR,		  //开关机标志位
+				   POWEROFISOK			  //正常关机标志位
+	} iapUserSettingsDef;
 
 typedef enum
 {
@@ -53,8 +62,7 @@ typedef enum
 extern int32_t  iapUserSettings[IAP_SETTING_SIZE];
 
 /* IAP command------------------------------------------------ */
-#define IAP_FLAG_ADDR   		(uint32_t)(ApplicationAddress - 1024 * 2)//App区域和Bootloader区域共享信息的地址(暂定大小为2K)
-#define IAP_FLAG_ADDR_NEW   (uint32_t)(ApplicationAddress - 1024 * 2 + 1024)
+
 #define SUCC_RUNNING_DATA		IAP_TOOL_NUM
 
 #define IAP_FLASH_SIZE  0x3000//Bootloader区域大小
@@ -64,8 +72,6 @@ void IAP_JUMP_WriteFlag(int32_t flag);//跳转时要写进rom的标志位
 void IAP_ReadALLFlag(void); //上电读取所有IAP标志位到ram
 void IAP_FUN_WriteFlag(uint8_t func,int32_t flag1,int32_t flag2);
 int32_t IAP_ReadSingleFlag(uint8_t addr);
-
-
 
 void IAP_Init(void);
 void IAP_Handle(u8 * cmd);

@@ -22,6 +22,9 @@ uint8_t gSensorState = 0;
 int32_t gWorkTimes = 0;
 uint8_t cut_start_position = 100;
 uint16_t gCutPauseTm=0;//切刀从工作到暂停的时间限制
+uint32_t gZeroVoltageTim = 0;
+OS_TMR *gSoftT1ms = NULL;
+struct home_detect ht={0};
 
 ToolFaultCode faultcode=FAULT_CODE_NONE;
 
@@ -34,8 +37,10 @@ uint8_t m_err;
  
 uint8_t GetBattaryQuantity(void)
 {
-
-	return (u8)Lisup. CurQtity;
+	uint8_t BatteryLevel;
+	BatteryLevel = (uint8_t)Lisup.CurQtity;
+	if(BatteryLevel >= 10) gZeroVoltageTim = 0;
+	return BatteryLevel;
 }
 
 void CutTool_SendState(void)    //状态反馈
@@ -59,7 +64,29 @@ void CutTool_SendState(void)    //状态反馈
 		OSMutexPost(USART_MUTEX);	
 	}
 }
+
 #endif
+uint32_t CombineU32_LF(uint8_t* data)
+{
+	return (data[0] + ((uint32_t)data[1]<<8) + ((uint32_t)data[2]<<16) + ((uint32_t)data[3]<<24));
+}
+uint32_t CombineU32_HF(uint8_t* data)
+{
+	return (data[3] + ((uint32_t)data[2]<<8) + ((uint32_t)data[1]<<16) + ((uint32_t)data[0]<<24));
+}
+//经测试延时1us时实际为1.174us
+//误差为17.4%
+void  delay_us(uint32_t us)
+{
+	us = us<<3;
+	while(us--);
+}		
+//经测试延时1ms时误差几乎为0
+void  delay_ms(uint16_t ms)
+{
+	while(ms--)
+		delay_us(1000);
+}		
 
 #ifdef	USE_PROTOCOL_V2
 extern uint16_t V3ToV2(void);
@@ -167,13 +194,13 @@ void GPIO_Config(void)
 
 /******************************POWER_IN电源按键检测****************************/   
 		/*选择要控制的GPIO引脚*/
-		GPIO_InitStructure.GPIO_Pin = POWIN_GPIO_PIN;	
+//		GPIO_InitStructure.GPIO_Pin = POWIN_GPIO_PIN;	
 
-		/*设置引脚模式为浮空输入*/
-        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    
-		/*调用库函数，初始化GPIO*/
-		GPIO_Init(POWIN_GPIO_PORT, &GPIO_InitStructure);	
+//		/*设置引脚模式为浮空输入*/
+//        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+//    
+//		/*调用库函数，初始化GPIO*/
+//		GPIO_Init(POWIN_GPIO_PORT, &GPIO_InitStructure);	
 
 /****************************************************************/
 
@@ -243,6 +270,7 @@ void GPIO_Config(void)
 	GPIO_SetBits(WIFI_RELOAD_GPIO_PORT,WIFI_RELOAD_PIN);	
 	GPIO_SetBits(STATELED_GPIO_PORT,STATELED_GPIO_PIN);
 	GPIO_SetBits(CAMERA_GPIO_PORT,CAMERA_GPIO_PIN);
+	DisablePowerShut();
 	gCameraState = 1;
 }
 
@@ -298,103 +326,110 @@ void PowerButtonScan(void)
 	static uint16_t gBt_power_tm=0;
 	uint16_t bq;
 
-	if (isPowerButtonDown())
-	{
-		gBt_power_tm +=20 ;
-		if (!power_state)//如果没电
-		{
-			if (gBt_power_tm >= 15000)//15秒
-			{
-				PowerLEDFlash(100);//按钮灯快闪
-				CutTool_Control(0,TOOL_CMD_FACTORY_RESET,0);
-			}
-			else if (gBt_power_tm >= 10000)
-			{
-				PowerLEDFlash(500);  
-				GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
-			}
-			else if (gBt_power_tm >= 500)
-			{
-				PowerLEDFlash(1);
-				SetPowerOn();
-			}
-		}
-		else
-		{			
-			if (gBt_power_tm >= 15000)
-			{
-			}
-			else if (gBt_power_tm >= 10000)
-			{
-				gWorkTimes = 0;
-				WriteUserSettings(VER_MODIFY_TIMES,0);
-				WriteUserSettings(WORK_TIMES,gWorkTimes);
-				PowerLEDFlash(1);
-			}
-			else if (gBt_power_tm >= 5000)
-			{
-				PowerLEDFlash(200);
-			}
-			else if (gBt_power_tm >= 2000)
-			{
-				PowerLEDFlash(100);
-			}
-			else
-			{
-				PowerLEDFlash(0);
-			}
-		}
-	}
-	else
-	{	
-		if (!power_state)
-		{
-			power_state = 1;
-			GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN);
-		}	
-		else
-		{
-			if (gBt_power_tm >= 10000)
-			{
-				SaveUserSettings();
-			}
-			else if (gBt_power_tm >= 5000)
-			{
-			}
-			else if (gBt_power_tm >= 2000) //2S关机
-			{
-				if (power_state)
-				{
-					power_state = 0;
-					WriteUserSettings(VER_MODIFY_TIMES,ReadUserSettings(VER_MODIFY_TIMES)-1);
-					SaveUserSettings();
-					#ifdef USE_BOOTLOADER
-					iapUserSettings[IAP_WORK_TIMES]=gWorkTimes;
-					IAP_FUN_WriteFlag(IAP_WRITE_POWER,0,POWER_OFF_DATA); 
-					#endif
+//	if (isPowerButtonDown())
+//	{
+//		gBt_power_tm +=20 ;
+//		if (!power_state)//如果没电
+//		{
+//			if (gBt_power_tm >= 15000)//15秒
+//			{
+//				PowerLEDFlash(100);//按钮灯快闪
+//				CutTool_Control(0,TOOL_CMD_FACTORY_RESET,0);
+//			}
+//			else if (gBt_power_tm >= 10000)
+//			{
+//				PowerLEDFlash(500);  
+//				GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
+//			}
+//			else if (gBt_power_tm >= 500)
+//			{
+//				PowerLEDFlash(1);
+//				SetPowerOn();
+//			}
+//		}
+//		else
+//		{			
+//			if (gBt_power_tm >= 15000)
+//			{
+//			}
+//			else if (gBt_power_tm >= 10000)
+//			{
+//				gWorkTimes = 0;
+//				WriteUserSettings(VER_MODIFY_TIMES,0);
+//				WriteUserSettings(WORK_TIMES,gWorkTimes);
+//				PowerLEDFlash(1);
+//			}
+//			else if (gBt_power_tm >= 5000)
+//			{
+//				PowerLEDFlash(200);
+//			}
+//			else if (gBt_power_tm >= 2000)
+//			{
+//				PowerLEDFlash(100);
+//			}
+//			else
+//			{
+//				PowerLEDFlash(0);
+//			}
+//		}
+//	}
+//	else
+//	{	
+//		if (!power_state)
+//		{
+//			power_state = 1;
+//			GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN);
+//		}	
+//		else
+//		{
+//			if (gBt_power_tm >= 10000)
+//			{
+//				SaveUserSettings();
+//			}
+//			else if (gBt_power_tm >= 5000)
+//			{
+//			}
+//			else if (gBt_power_tm >= 2000) //2S关机
+//			{
+//				if (power_state)
+//				{
+//					power_state = 0;
+//					WriteUserSettings(VER_MODIFY_TIMES,ReadUserSettings(VER_MODIFY_TIMES)-1);
+//					SaveUserSettings();
+//					#ifdef USE_BOOTLOADER
+//					iapUserSettings[IAP_WORK_TIMES]=gWorkTimes;
+//					IAP_FUN_WriteFlag(IAP_WRITE_POWER,0,POWER_OFF_DATA); 
+//					#endif
 
-					delay_ms(10);
-					SetPowerOff();
-				}
-			}
-			else
-			{
+//					delay_ms(10);
+//					SetPowerOff();
+//				}
+//			}
+//			else
+//			{
 				bq = GetBattaryQuantity();
 				if (bq > 50)
 				{
-					PowerLEDFlash(1);
+					PowerLEDFlash(0);
+				}
+				else if(bq == 0)
+				{
+					if(runflg>=3000)
+					{
+						GPIO_WriteBit(GPIOB,BT_LED_GPIO_PIN,0);
+					}
 				}
 				else
 				{
 					PowerLEDFlash(bq*20);
 				}
-			}
-		}
-		if(gBt_power_tm != 0)
-		{
-			gBt_power_tm = 0;
-		}
-	}
+//			}
+//		}
+//		if(gBt_power_tm != 0)
+//		{
+//			gBt_power_tm = 0;
+//		}
+//	}
 }
 
 void CutMotor_SetPWM(uint16_t DutyRadio)
@@ -418,18 +453,23 @@ void InitAllMotors(void)
 	Grip_Init(0);
 }
 
+void Creat_softTimer(void)
+{
+    uint8_t err;
+
+	if (gSoftT1ms == NULL)
+	{
+		gSoftT1ms = OSTmrCreate(100, 1, OS_TMR_OPT_PERIODIC, SoftTim1ms_callback, NULL, NULL, &err);
+		OSTmrStart(gSoftT1ms, &err);
+	}
+}
+
 void InitAllDevice(void)
 {
 	uint16_t succrunFLAG;
 	USART_MUTEX = OSMutexCreate(MUTEX_TASK_PRIO,&m_err);
 	GPIO_Config();
-	CanBus_Init(0,CAN_BURD_1M);
-	ADC1_Config();
-	delay_ms(100);
-	ADC1_SetOffset(MOTOR_CURRENT_CHANNEL);
-	USART_Config(TOOL_CONTROL_PORT,115200);
-	PR_Time3PWMInit(TIME3_PWM_FREQUENCY);
-	IWDG_Init(1000);		//看门狗1S超时
+	framflash_init();
 	#ifdef USE_BOOTLOADER
 	IAP_ReadALLFlag(); //读取所有IAP相关标志位
 	succrunFLAG = (uint16_t)IAP_ReadSingleFlag(FINISH_RUNNING_ADDR);
@@ -438,9 +478,17 @@ void InitAllDevice(void)
 		IAP_FUN_WriteFlag(IAP_WRITE_RUNNING,SUCC_RUNNING_DATA,0); 
 	}
 	#endif
+	CanBus_Init(0,CAN_BURD_1M);
+	ADC1_Config();
+	delay_ms(100);
+	norflash_init();
+	ADC1_SetOffset(MOTOR_CURRENT_CHANNEL);
+	USART_Config(TOOL_CONTROL_PORT,115200);
+	PR_Time3PWMInit(TIME3_PWM_FREQUENCY);
+	IWDG_Init(1000);		//看门狗1S超时
 	InitUserSettings(1);
 	InitAllMotors();
-
+	Log_init();
 	WriteUserSettings(VER_SOFT,SOFT_VERSION);
 	WriteUserSettings(VER_SOFT_DATE,SOFT_DATE);
 	gWorkTimes = ReadUserSettings(WORK_TIMES);
@@ -449,6 +497,7 @@ void InitAllDevice(void)
 		gCutModuleState = MODULE_STATE_HOME;
 		cut_motor_state.work_state = WORK_STATE_HOME;
 	}
+	Creat_softTimer();
 }
 void SendDeviceInfo(void)
 {
@@ -538,6 +587,9 @@ CommandReturn CutMotorControl(uint8_t cmd, int8_t data)
 		Steering_Motor_Move(&cut_motor,cut_motor.origin);
 		cut_motor_state.work_state = WORK_STATE_IDLE;
 		gCutModuleState = MODULE_STATE_NOMAL;
+		ht.aver_curent = 0;
+		ht.betime=0;
+		ht.motiontim=0;
 		break;
 	case MOTOR_CMD_CCW:
 		if (cut_motor_state.work_state == WORK_STATE_IDLE)		
@@ -564,6 +616,10 @@ CommandReturn CutMotorControl(uint8_t cmd, int8_t data)
 			if(gCutModuleState != MODULE_STATE_MAX)
 			{
 				Steering_Motor_Move(&cut_motor,(5000- (ReadUserSettings(CUT_CUT_SPEED_1)>>1)));
+				DisablePowerShut();
+				ht.aver_curent = 0;
+				ht.betime=0;
+				ht.motiontim=0;
 			}
 			else
 				ret = RT_MOTOR_IS_LIMIT;
@@ -578,6 +634,9 @@ CommandReturn CutMotorControl(uint8_t cmd, int8_t data)
 			if(gCutModuleState != MODULE_STATE_HOME)
 			{
 				Steering_Motor_Move(&cut_motor,(5000 + (ReadUserSettings(CUT_HOME_SPEED)>>1)));
+				ht.aver_curent = 0;
+				ht.betime=0;
+				ht.motiontim=0;
 			}
 			else
 				ret = RT_MOTOR_IS_HOME;
@@ -589,7 +648,13 @@ CommandReturn CutMotorControl(uint8_t cmd, int8_t data)
 
 	return ret;
 }
-
+void cuttool_FailRecoder(uint8_t modulecode,uint8_t info_0, int16_t info_1)
+{
+	gFault.module = modulecode;//B1
+	gFault.tool_state = tool_state; //B3
+	gFault.info_0 = info_0;
+	gFault.info_1 = info_1;
+}
 void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 {
 	int16_t speed;
@@ -602,6 +667,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 			case TOOL_CMD_STOP:
 				Grip_Control(MOTOR_CMD_STOP,0);
 				CutMotorControl(MOTOR_CMD_STOP,0);
+				gFault.fault = FAULT_CODE_NONE;
 				tool_state = TOOL_STATE_STOPPING;//改变工具状态为停止
 				break;
 			case TOOL_CMD_READY:
@@ -632,6 +698,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 					Grip_Control(MOTOR_CMD_HOME,0);
 					CutMotorControl(MOTOR_CMD_HOME,0);
 					hometim=0;
+					gFault.fault = FAULT_CODE_NONE;
 					tool_state = TOOL_STATE_HOMING;
 				}
 				else
@@ -646,6 +713,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 						{
 							CutMotorControl(MOTOR_CMD_WORK,0);
 							tool_state = TOOL_STATE_WORK;
+							DisablePowerShut();
 						}
 						else
 							rt = RT_TOOL_NOT_READY;
@@ -656,6 +724,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 						{
 							Steering_Motor_Move(&cut_motor,(5000- (ReadUserSettings(CUT_CUT_SPEED_1)>>1)));
 							tool_state = TOOL_STATE_WORK;
+							DisablePowerShut();
 						}
 						else
 							rt = RT_TOOL_NOT_PAUSE;
@@ -685,6 +754,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 			case TOOL_CMD_FACTORY_RESET://恢复出厂设置
 				if (tool_state == TOOL_STATE_MANUL)
 				{
+					iapUserSettings[IAP_WORK_TIMES] = ReadUserSettings(WORK_TIMES);
 					InitUserSettings(0);
 				}
 				else
@@ -697,6 +767,45 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 //				SetPowerOff();
 //			break;
 			default: return;
+		}
+	}
+	else if(motor == 0xFF)	//日志
+	{
+		if (cmd == 1)//日志查询
+		{
+			if (tool_state == TOOL_STATE_MANUL)
+			{
+				Log_QueryDate(data[0], data[1], data[2]);
+				return;
+			}
+			else
+			{
+				rt = RT_TOOL_NOT_MANUL;
+			}
+		}
+		else if (cmd == 2)//校时
+		{
+			RTC_SetTime(data);
+		}
+		else if (cmd == 3) //查询系统信息
+		{
+			Log_GetSystemInfo();
+			return;
+		}
+		else if (cmd == 4) //查询系统时间
+		{
+			Log_GetSystemClock();
+			return;
+		}
+		else if (cmd == 5) //按页查询日志
+		{
+			Log_QueryPage(data[0] + (data[1] << 8), data[2] + (data[3] << 8));
+			return;
+		}
+		else if (cmd == 16) //调试
+		{
+			Log_Debug(data[0]);
+			return;
 		}
 	}
 	else
@@ -731,30 +840,191 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 			if (TSB(motor,MOTOR_CUT))
 			{
 				rt = CutMotorControl(cmd,speed);
+				if(rt == RT_OK)
+				{
+					tool_state = TOOL_STATE_MANUL;
+				}
 			}
 			if (TSB(motor,MOTOR_GRIP))
 			{
 				rt = Grip_Control(cmd,speed);
+				if(rt == RT_OK)
+				{
+					tool_state = TOOL_STATE_MANUL;
+				}
 			}			
 		}
 	}
 	CutTool_CommandReply(motor,cmd,rt);
 }
 
+int16_t Cutter_GetMotorCurrent(void)
+{
+	static int16_t cutter_currentbuf[10];
+	static uint8_t cutter_current_index = 0;
+	uint8_t i = 0;
+	int32_t temp = 0;
+	int16_t rescurrent=0;
+	//电流10次平均值滤波
+	cutter_currentbuf[cutter_current_index] = CutMotor_GetCurrent();
+	cutter_current_index++;
+	if (cutter_current_index == 10)
+		cutter_current_index = 0;
+	for (i = 0; i < 10; i++)
+		temp += cutter_currentbuf[i];
+	rescurrent = temp / 10;
+
+	return rescurrent;
+}
+
+void Send_val(int32_t val)
+{
+	static int temp[5] = {0};
+	static uint8_t tindex = 0;
+	int i=0;
+	uint8_t buf[40] = {0xCC,0x55};
+	int vol;
+
+	temp[tindex++]=val;
+	if(tindex==5)
+	{
+			buf[2] = 0x15;
+			
+			for(i=0;i<5;i++)
+			{
+				buf[3+(i*4)] = temp[i];
+				buf[4+(i*4)] = temp[i]>>8;
+				buf[5+(i*4)] = temp[i]>>16;
+				buf[6+(i*4)] = temp[i]>>24;
+				buf[23] = buf[23] + buf[3+(i*4)] +buf[4+(i*4)]+buf[5+(i*4)]+buf[6+(i*4)];
+			}
+			buf[23] = buf[23] +buf[2];
+			if (OSMutexAccept(USART_MUTEX,&m_err))
+			{
+				UART_SendBuf(TOOL_CONTROL_PORT,buf,24);
+				OSMutexPost(USART_MUTEX);	
+			}
+			tindex = 0;
+	}
+}
+
 
 int16_t test_cuttent[500] = {0};
 uint16_t test_index = 0;
 int16_t this_current = 0;
-
+uint16_t tm_cut_1 = 0;
 uint16_t test_tm2=0;
+
+void SoftTim1ms_callback(void *ptmr, void *parg)
+{
+	Grip_Update();
+	Cutter_GetMotorCurrent();
+	if(IsHomeSensorOn())
+	{			
+		STB(gSensorState,1);
+		if(cut_motor_state.motion_state == MOTION_STATE_STOPPED)
+		{
+			gCutModuleState = MODULE_STATE_HOME;
+
+			
+			if(tool_state == TOOL_STATE_HOMING)
+			{
+				if (gGripModuleState == MODULE_STATE_HOME)
+				{
+					tool_state = TOOL_STATE_HOMED;						
+				}
+			}
+		}
+		else if (cut_motor_state.motion_state == MOTION_STATE_CCW)
+		{
+			Steering_Motor_Move(&cut_motor,cut_motor.origin);
+		}
+	}
+	else if(IsWorkSensorOn())
+	{
+		STB(gSensorState,0);
+		if(cut_motor_state.motion_state == MOTION_STATE_STOPPED)
+		{
+			gCutModuleState = MODULE_STATE_MAX;
+			test_index = 0;
+		}
+		else if (cut_motor_state.motion_state == MOTION_STATE_CW)
+		{
+			Steering_Motor_Move(&cut_motor,cut_motor.origin);
+		}			
+	}
+	else
+	{			
+		gSensorState = 0;
+		if(tool_state == TOOL_STATE_HOMING)
+		{
+			//this_current = Cutter_GetMotorCurrent();
+			//homedetect();
+			if(hometim<15000)
+			{
+				hometim +=1;
+			}else{
+				Steering_Motor_Move(&cut_motor,cut_motor.origin);
+				Grip_Control(MOTOR_CMD_STOP,0);
+				tool_state = TOOL_STATE_HOMEFAILURE;
+				gFault.fault = FAULT_HOMESENSOR;
+				cuttool_FailRecoder(HOMESENSOR_MOD,0,0);
+				hometim=0;
+			}
+		}
+	}
+	
+}
+
+void homedetect(void)
+{
+	static int32_t temp=0;
+	if(ReadUserSettings(CUT_DETECT_ENABLE)==0)
+	{
+		return ;
+	}
+	ht.motiontim+=20;
+	if(ht.motiontim>500)
+	{
+		if(ht.flg==0&&ht.motiontim > ReadUserSettings(CUT_DETECT_TIME_1)) 
+		{
+			ht.aver_curent = ht.aver_curent/ht.betime;
+			WriteUserSettings(CUT_DETECT_CURRENT,ht.aver_curent);
+			ht.flg=1;
+		}else if(ht.flg==1&&ht.motiontim > ReadUserSettings(CUT_DETECT_TIME_1))
+		{
+			if(ABS(this_current)>(ht.aver_curent*ReadUserSettings(CUT_DETECT_MAXRATIO)/10)||ABS(this_current)<(ht.aver_curent*10/ReadUserSettings(CUT_DETECT_MAXRATIO)))
+			{
+				WriteUserSettings(CUT_DETECT_MAX,ABS(this_current));
+				Steering_Motor_Move(&cut_motor,cut_motor.origin);
+				tool_state = TOOL_STATE_MANUL; 
+				gFault.fault = FAULT_HOMESENSOR;
+				tm_cut_1 = 0;
+				cuttool_FailRecoder(HOMESENSOR_MOD,this_current,ht.aver_curent);
+				ht.flg=2;
+			}
+		}else if(ht.flg==0&&ht.motiontim <= ReadUserSettings(CUT_DETECT_TIME_1))
+		{
+			ht.betime++;
+			ht.aver_curent = ht.aver_curent + this_current;
+		}
+	}else{
+		ht.flg=0;
+		ht.aver_curent=0;
+		ht.betime=0;
+	}
+}
+
 
 void Task_Tool(void *p_arg)
 {
   	uint8_t cut_step = 0;
 	uint16_t tm_cut = 0;
-	uint16_t tm_cut_1 = 0;
+	
 	uint16_t tm_cut_2 = 0;
-
+	uint32_t tm_cut_tatal = 0;
+static uint8_t powofflg=0;
+	int16_t last_bat = 0;
 //	if(!ReadUserSettings(WIFI_NET_CONFIG))
 //	{
 //		CoifigWifiNet();
@@ -764,7 +1034,7 @@ void Task_Tool(void *p_arg)
 	{
 		StateLEDFlash(500);
 		PowerButtonScan();
-		Grip_Update();
+		
 		gGripModuleState = Grip_GetModuleState();
 		
 		if ((cut_motor.current >= 9660)&&(cut_motor.current < 14600))    //正转
@@ -788,7 +1058,8 @@ void Task_Tool(void *p_arg)
 		if (tool_state == TOOL_STATE_WORK)
 		{
 			tm_cut_1 += 20;
-			this_current = CutMotor_GetCurrent();
+			tm_cut_tatal+=20;
+			this_current = Cutter_GetMotorCurrent();
 			if (cut_step == 0)//开始断线
 			{
 				if(!IsHomeSensorOn())
@@ -800,18 +1071,21 @@ void Task_Tool(void *p_arg)
 				cut_step = 1;	
 				}
 				tm_cut_1 = 0;
-			}else if(cut_step == 6)
+				tm_cut_tatal=0;
+			}else if(cut_step == 6) //复位过程
 			{
+				//homedetect();
 				if(IsHomeSensorOn())
 				{
 					tm_cut_1 = 0;
 					cut_step=7;
 				}else if(tm_cut_1>=15000)
 				{
-					Steering_Motor_Move(&cut_motor,0);
+					Steering_Motor_Move(&cut_motor,cut_motor.origin);
 					tm_cut_1=0;
 					tool_state = TOOL_STATE_FAILURE;
-					faultcode = FAULT_HOMESENSOR;
+					gFault.fault = FAULT_HOMESENSOR;
+					cuttool_FailRecoder(HOMESENSOR_MOD,cut_step,0);
 				}
 			}else if(cut_step == 7)
 			{
@@ -851,11 +1125,16 @@ void Task_Tool(void *p_arg)
 			}
 			else if (cut_step == 2)//通过传感器检测断线完成
 			{
-				if(IsWorkSensorOn() || (tm_cut_1 > 20000))
+				if(IsWorkSensorOn())
 				{
 					Steering_Motor_Move(&cut_motor,cut_motor.origin);
 					tm_cut_1 = 0;
 					cut_step =3;
+				}else if((tm_cut_1 > 20000))
+				{
+					Steering_Motor_Move(&cut_motor,cut_motor.origin);
+					tm_cut_1 = 0;
+					cut_step=11;
 				}
 			}
 			else if (cut_step == 3)//切刀复位
@@ -871,7 +1150,16 @@ void Task_Tool(void *p_arg)
 			{
 				if (cut_motor_state.motion_state == MOTION_STATE_CCW)
 				{
+					//homedetect();
 					if (IsHomeSensorOn() || tm_cut_1 > 20000)
+					{
+						Steering_Motor_Move(&cut_motor,cut_motor.origin);
+						tm_cut_1 = 0;
+						cut_step = 5;
+					}
+				}else if(cut_motor_state.motion_state== MOTION_STATE_STOPPED)
+				{
+					if(IsHomeSensorOn())
 					{
 						Steering_Motor_Move(&cut_motor,cut_motor.origin);
 						tm_cut_1 = 0;
@@ -886,6 +1174,14 @@ void Task_Tool(void *p_arg)
 					tool_state = TOOL_STATE_SUCCEED;
 					gWorkTimes++;
 					WriteUserSettings(WORK_TIMES,gWorkTimes);
+					SaveUserSettings();
+					gNomalInfo.info_code=1;
+					gNomalInfo.tool_state = tool_state;
+					gNomalInfo.param_0=gCutPauseTm;
+					gNomalInfo.param_1=tm_cut_tatal;
+					gNomalInfo.param_2=gWorkTimes;
+					tm_cut_tatal=0;
+					Log_RecordNomalInfo(&gNomalInfo);
 				}
 			}
 			else if (cut_step == 10)//断线暂停
@@ -902,7 +1198,8 @@ void Task_Tool(void *p_arg)
 				if (cut_motor_state.motion_state == MOTION_STATE_STOPPED)
 				{
 					tool_state = TOOL_STATE_FAILURE;
-					faultcode = FAULT_CUTWOKE;
+					gFault.fault = FAULT_CUTWOKE;
+					cuttool_FailRecoder(SCREW_MOD,cut_step,0);
 					cut_step =0;
 				}
 			}
@@ -972,56 +1269,7 @@ void Task_Tool(void *p_arg)
 		}
 
 
-		if(IsHomeSensorOn())
-		{			
-			STB(gSensorState,1);
-			if(cut_motor_state.motion_state == MOTION_STATE_STOPPED)
-			{
-				gCutModuleState = MODULE_STATE_HOME;
 
-				
-				if(tool_state == TOOL_STATE_HOMING)
-				{
-					if (gGripModuleState == MODULE_STATE_HOME)
-					{
-						tool_state = TOOL_STATE_HOMED;						
-					}
-				}
-			}
-			else if (cut_motor_state.motion_state == MOTION_STATE_CCW)
-			{
-				Steering_Motor_Move(&cut_motor,cut_motor.origin);
-			}
-		}
-		else if(IsWorkSensorOn())
-		{
-			STB(gSensorState,0);
-			if(cut_motor_state.motion_state == MOTION_STATE_STOPPED)
-			{
-				gCutModuleState = MODULE_STATE_MAX;
-				test_index = 0;
-			}
-			else if (cut_motor_state.motion_state == MOTION_STATE_CW)
-			{
-				Steering_Motor_Move(&cut_motor,cut_motor.origin);
-			}			
-		}
-		else
-		{			
-			gSensorState = 0;
-			if(tool_state == TOOL_STATE_HOMING)
-			{
-				if(hometim<15000)
-				{
-					hometim +=20;
-				}else{
-					Steering_Motor_Move(&cut_motor,0);
-				tool_state = TOOL_STATE_HOMEFAILURE;
-				faultcode = FAULT_HOMESENSOR;
-					hometim=0;
-				}
-			}
-		}
 
 		if(cut_motor_state.work_state == WORK_STATE_WORK)
 		{
@@ -1047,6 +1295,47 @@ void Task_Tool(void *p_arg)
 		// {
 		// 	tool_state = TOOL_STATE_MANUL;
 		// }
+		//Send_val(cut_step);
+		//检测故障并存储日志
+		//存储的信息是故障前的模块状态，故障时的电机电流，故障时的工具状态
+		if (gFault.fault != 0)
+		{
+			if (faultcode == 0)
+			{
+				Realtime_Qtity();
+				gFault.bat_vol = Lisup.RealVol;
+				if (gFault.module != 0) //不是工具
+				{
+					gFault.tool_state = tool_state;
+				}
+				Log_RecordFaultInfo(&gFault);
+				faultcode = gFault.fault;
+			}
+		}
+		else
+		{
+			faultcode = 0;
+		}
+		
+				//电压第一次低于15V记录
+		if (Lisup.RealVol > 18000)
+		{
+			last_bat = Lisup.RealVol;
+		}
+		else if (Lisup.RealVol < 15000)
+		{
+			if (last_bat > 18000)
+			{
+				//电池电压低
+				Log_RecordPowerInfo(4, Lisup.RealVol, 0);
+			}
+			last_bat = Lisup.RealVol;
+		}
+		if(tm_cut%10==0)
+		{
+			Log_SendData();
+		}
+		
 		
 		tm_cut += 20;
 		if (tm_cut > 100)
@@ -1054,6 +1343,24 @@ void Task_Tool(void *p_arg)
 			Realtime_Qtity();
 			CutTool_SendState();
 			tm_cut = 0;
+		}
+		
+			gZeroVoltageTim += 1;
+			if (gZeroVoltageTim > 60000) 
+			{
+				if(tool_state != RT_TOOL_WORKING&&powofflg==0)
+				{
+					powofflg=1;
+					gZeroVoltageTim=0;
+					WriteUserSettings(VER_MODIFY_TIMES,ReadUserSettings(VER_MODIFY_TIMES)-1); //1.19
+					SaveUserSettings(); //保存配置
+					delay_ms(10);	
+					#ifdef USE_BOOTLOADER
+					iapUserSettings[IAP_WORK_TIMES] = gWorkTimes;
+					#endif
+					delay_ms(20);
+					EnablePowerShut();		
+			}
 		}
 
 		OSTimeDly(20);

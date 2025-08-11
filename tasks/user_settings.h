@@ -22,8 +22,8 @@
 
 //////////////////////////////////////////////////////////////
 
-#define SOFT_VERSION	4400
-#define SOFT_DATE		20250417
+#define SOFT_VERSION	4451
+#define SOFT_DATE		20250717
 
 #define		PRO_HEAD0	0xAA
 #define		PRO_HEAD1 0x55
@@ -83,6 +83,12 @@ typedef enum
 	CUT_CUT_TIME_2,			//断线第二段时间   
 	CUT_CUT_CURRENT_2,	//断线第二段截止电流
 	CUT_CUT_TIME_3,			//断线第二段时间   
+	
+	CUT_DETECT_TIME_1=89,
+	CUT_DETECT_CURRENT=90,
+	CUT_DETECT_MAXRATIO,
+	CUT_DETECT_MAX,
+	CUT_DETECT_ENABLE,
 
 	WIFI_NET_CONFIG = 95,
 	WORK_TIMES= 96,

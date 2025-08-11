@@ -249,14 +249,14 @@ void Cable_Measuring(void)
 // uint8_t test_mode[10] = {0};
 // uint16_t test_tim[10] = {0};
 // uint8_t test_index = 0;
-//void Grip_fault(uint8_t fault, uint8_t info_0, uint16_t info_1)
-//{
-//	gFault.module = 5;
-//	gFault.fault = fault;
-//	gFault.info_0 = info_0;
-//	gFault.info_1 = info_1;
-//	gGrip.step = 0;
-//}
+void Grip_fault(uint8_t fault, uint8_t info_0, uint16_t info_1)
+{
+	gFault.module = 5;
+	gFault.fault = fault;
+	gFault.info_0 = info_0;
+	gFault.info_1 = info_1;
+	gGrip.step = 0;
+}
 void Grip_Update(void)
 {
 	static uint32_t grip_current_agv = 0;//平均电流
@@ -449,8 +449,7 @@ void Grip_Update(void)
 				}
 				else
 				{
-					faultcode=err_grip_unlock_fail;
-					//Grip_fault(err_grip_unlock_fail, (gGrip.state << 4) + (gGrip.motor_state.work_state << 2) + gGrip.motor_state.motion_state, gGrip.pos);
+					Grip_fault(err_grip_unlock_fail, (gGrip.state << 4) + (gGrip.motor_state.work_state << 2) + gGrip.motor_state.motion_state, gGrip.pos);
 					gGrip.state = MODULE_STATE_ERROR;
 					gGrip.step = 0;
 					gGrip.mode = 0;
@@ -464,7 +463,10 @@ void Grip_Update(void)
 		{
 			gGrip.mode = 10;
 			gGrip.step = 0;
-			Servo_Motor_Enable(&gGripMotor, FALSE);
+			if(gGrip.timer>=1000)
+			{
+				Servo_Motor_Enable(&gGripMotor, FALSE);
+			}
 		}
 	}
 	// if (test_step[test_index] != gGrip.step)
@@ -497,17 +499,19 @@ void Grip_Update(void)
 		msg_cnts = DJ_GetMsgCounts(ID_GRIP_L_MOTOR);
 		if (ABS(msg_cnts - grip_msg_cnts_last) <= 5)
 		{
-			if (faultcode == 0)
+			if (gFault.fault == 0)
 			{
-				faultcode=err_zkgrip_disconnect;
-				//Grip_fault(err_zkgrip_disconnect, (gGrip.state << 4) + (gGrip.motor_state.work_state << 2) + gGrip.motor_state.motion_state, 0);
+				if(tool_state!=TOOL_STATE_WORK&&tool_state!=TOOL_STATE_SUCCEED&&tool_state!=TOOL_STATE_FAILURE)
+				{
+					Grip_fault(err_zkgrip_disconnect, (gGrip.state << 4) + (gGrip.motor_state.work_state << 2) + gGrip.motor_state.motion_state, 0);
+				}
 			}
 		}
 		else
 		{
-			if (faultcode == err_zkgrip_disconnect)
+			if (gFault.fault == err_zkgrip_disconnect)
 			{
-				faultcode = 0;
+				gFault.fault = 0;
 			}
 		}
 		grip_msg_cnts_last = msg_cnts;
@@ -520,8 +524,7 @@ void Grip_Update(void)
 			grip_current_agv += ABS(gGrip.motor_current) / 100; //获取平均电流，电流越大，累积越快
 			if (grip_current_agv > 40000)				//相当于2s内电流持续大于2A		   
 			{
-				faultcode=err_grip_overcurrent;
-				//Grip_fault(err_grip_overcurrent, (gGrip.state << 4) + (gGrip.motor_state.work_state << 2) + gGrip.motor_state.motion_state, gGrip.motor_current);
+				Grip_fault(err_grip_overcurrent, (gGrip.state << 4) + (gGrip.motor_state.work_state << 2) + gGrip.motor_state.motion_state, gGrip.motor_current);
 				Servo_Motor_QuickStop(&gGripMotor);
 				gGrip.mode = 0;
 				gGrip.step = 0;

@@ -26,8 +26,16 @@
 //通用定义文件
 #include "../user_define.h"
 #include "grip.h" 
+#include "lidischarge.h"
 
-extern ToolFaultCode faultcode;
+struct home_detect
+{
+	int32_t aver_curent;
+	uint32_t betime;
+	uint32_t motiontim;
+	uint8_t  flg;
+};
+
 
 #define CAMERA_GPIO_PORT    	GPIOA			              /* GPIO端口 */
 #define CAMERA_GPIO_CLK 	    RCC_APB2Periph_GPIOA		/* GPIO端口时钟 */
@@ -52,7 +60,7 @@ extern ToolFaultCode faultcode;
 
 #define BT_LED_GPIO_PORT    	GPIOB			              /* GPIO端口 */
 #define BT_LED_GPIO_CLK 	    RCC_APB2Periph_GPIOB		/* GPIO端口时钟 */
-#define BT_LED_GPIO_PIN		    GPIO_Pin_5       
+#define BT_LED_GPIO_PIN		    GPIO_Pin_0       
 
 #define STATELED_GPIO_PORT    	GPIOB		              /* GPIO端口 */
 #define STATELED_GPIO_CLK 	    RCC_APB2Periph_GPIOB		/* GPIO端口时钟 */
@@ -61,6 +69,9 @@ extern ToolFaultCode faultcode;
 #define WIFI_RELOAD_GPIO_PORT  GPIOB
 #define WIFI_RELOAD_GPIO_CLK 	    RCC_APB2Periph_GPIOB		/* GPIO端口时钟 */
 #define WIFI_RELOAD_PIN				GPIO_Pin_13	
+
+#define DisablePowerShut()						GPIOB->BSRR = POWON_GPIO_PIN;
+#define EnablePowerShut()					GPIOB->BRR = POWON_GPIO_PIN;
 
 #define TOOL_CONTROL_PORT				USART1
 #define TOOL_CONTROL_BUF				BUF_USART1
@@ -82,12 +93,14 @@ uint8_t CutTool_GetState(void);
 void StateLEDFlash(uint16_t period);
 void PowerButtonScan(void);
 void PowerLEDFlash(uint16_t period);
+void SoftTim1ms_callback(void *ptmr, void *parg);
 
-
+void  delay_ms(uint16_t ms);
 //配置工具的任务,不用改
 #define TOOL_TASK_STK_SIZE							300
 extern OS_STK tool_task_stk[TOOL_TASK_STK_SIZE]; 
 void Task_Tool(void *p_arg);
+extern ToolStateDef tool_state;
 
 #endif
 /******************* (C) COPYRIGHT 2020 REAPDARO *****END OF FILE****/

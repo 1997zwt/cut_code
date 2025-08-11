@@ -29,7 +29,7 @@
 #include "../drv/drv_dog.h"
 #endif
 
-#define USE_FLASH	
+//#define USE_FLASH	
 #ifdef	USE_FLASH
 #include "../drv/drv_flash.h"
 #endif
@@ -38,6 +38,28 @@
 #ifdef	 USE_BOOT_LOADER
 #include "../drv/iap.h"				 //boot loader
 #endif
+
+#define USE_NORFLASH
+#ifdef USE_NORFLASH
+#include "../drv/drv_norflash.h"
+#endif
+
+#define USE_SPI_FRAM
+#ifdef USE_SPI_FRAM
+#include "../drv/st_spi.h"
+#include "../drv/drv_spifram.h"
+//fram地址分配：0-1K，boot；1-2K，参数，10-32K，日志
+#define USER_BOOT_SAVE_BASE   0
+#define USER_SET_SAVE_BASE    1024
+#define USER_LOG_SAVE_BASE    10240
+#endif
+
+#define USE_LOG
+#ifdef USE_LOG
+#include "log.h" //日志
+#endif
+
+#define USE_PVD
 
 //配置串口
 #define USE_USART1

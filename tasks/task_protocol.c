@@ -330,6 +330,10 @@ void Task_Protocol(void *p_arg)
 						if (databuf[3] == DEVICE_CMD_INFO)   //查询工具信息
 						{
 							SendDeviceInfo();
+							if(len==11)
+							{
+								RTC_SetTime(databuf+4);
+							}
 						}			
 						if (databuf[3] == DEVICE_SET_NO)
 						{
@@ -371,6 +375,13 @@ void Task_Protocol(void *p_arg)
 						{
 							CutterRegulator_Control(databuf[4],databuf[5],&databuf[6]);
 						}
+	#endif
+#ifdef USE_LOG
+						databuf[len - 1] = 0;
+						databuf[len] = 0;
+						databuf[len+1] = 0;
+						databuf[len+2] = 0;
+						Log_RecordCmdInfo(&databuf[3]);
 	#endif
 					}
 					index = 0;
