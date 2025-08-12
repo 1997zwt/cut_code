@@ -38,29 +38,50 @@ uint8_t m_err;
 uint8_t GetBattaryQuantity(void)
 {
 	uint8_t BatteryLevel;
-	BatteryLevel = (uint8_t)Lisup.CurQtity;
-	if(BatteryLevel >= 10) gZeroVoltageTim = 0;
+	static uint16_t runflg=0;
+	
+	if(runflg<5000)
+	{
+		runflg+=20;
+		BatteryLevel=0;
+		PowerLEDFlash(1);
+	}else{
+		BatteryLevel = (uint8_t)Lisup.CurQtity;
+		if (BatteryLevel >= 10) // 电量小于10，1分钟后启动低电压关机功能
+		{
+			gZeroVoltageTim = 0;
+		}
+		if (BatteryLevel > 50)
+		{
+			PowerLEDFlash(1);
+		}
+		else
+		{
+			PowerLEDFlash(BatteryLevel * 20);
+		}
+	}
+
 	return BatteryLevel;
 }
 
 void CutTool_SendState(void)    //状态反馈
 {
-	uint8_t buf[20] = {0xAA,0x55,0x0a,TOOL_TYPE_CUT,0x03,MOTOR_CMD_REPORT,0x00};
+	uint8_t buf[20] = {0xAA,0x55,0x09,TOOL_TYPE_CUT,0x03,MOTOR_CMD_REPORT,0x00};
 
 	if (OSMutexAccept(USART_MUTEX,&m_err))
 	{
 		buf[6] = GetBattaryQuantity();
 		buf[7] = tool_state;
-		buf[8] = faultcode;
-		buf[9] = gSensorState + (gCameraState << 6);
-		buf[10] = cut_motor_state.motion_state + (cut_motor_state.work_state<<2) + (gCutModuleState<<4);
+		//buf[8] = faultcode;
+		buf[8] = gSensorState + (gCameraState << 6);
+		buf[9] = cut_motor_state.motion_state + (cut_motor_state.work_state<<2) + (gCutModuleState<<4);
 		
 		grip_motor_state = Grip_GetMotorState();
 		
-		buf[11] = grip_motor_state.motion_state+ (grip_motor_state.work_state<<2) + (gGripModuleState<<4);
+		buf[10] = grip_motor_state.motion_state+ (grip_motor_state.work_state<<2) + (gGripModuleState<<4);
 
-		buf[12] = buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8] + buf[9] + buf[10]+buf[11];
-		UART_SendBuf(TOOL_CONTROL_PORT,buf,13);
+		buf[11] = buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8] + buf[9] + buf[10];
+		UART_SendBuf(TOOL_CONTROL_PORT,buf,12);
 		OSMutexPost(USART_MUTEX);	
 	}
 }
@@ -178,7 +199,13 @@ void GPIO_Config(void)
 		GPIO_Init(SENSOR1_GPIO_PORT, &GPIO_InitStructure);	
 
 /****************************************************************/
+		GPIO_InitStructure.GPIO_Pin = WIFIBUTTON_PIN;	
 
+		/*设置引脚模式为浮空输入*/
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    
+		/*调用库函数，初始化GPIO*/
+		GPIO_Init(GPIOB, &GPIO_InitStructure);	
 /******************************SENSOR2传感器****************************///复位极限 
 		/*选择要控制的GPIO引脚*/
 		GPIO_InitStructure.GPIO_Pin = SENSOR2_GPIO_PIN;	
@@ -307,8 +334,8 @@ void PowerLEDFlash(uint16_t period)
 
 	if(period <= 1)
 	{
-		bitstate = period^1;
-		GPIO_WriteBit(BT_LED_GPIO_PORT,BT_LED_GPIO_PIN,(BitAction)bitstate);
+		//bitstate = period^1;
+		GPIO_WriteBit(BT_LED_GPIO_PORT,BT_LED_GPIO_PIN,(BitAction)period);
 		return;
 	}
 	power_tim +=20;
@@ -407,22 +434,22 @@ void PowerButtonScan(void)
 //			}
 //			else
 //			{
-				bq = GetBattaryQuantity();
-				if (bq > 50)
-				{
-					PowerLEDFlash(0);
-				}
-				else if(bq == 0)
-				{
-					if(runflg>=3000)
-					{
-						GPIO_WriteBit(GPIOB,BT_LED_GPIO_PIN,0);
-					}
-				}
-				else
-				{
-					PowerLEDFlash(bq*20);
-				}
+//				bq = GetBattaryQuantity();
+//				if (bq > 50)
+//				{
+//					PowerLEDFlash(0);
+//				}
+//				else if(bq == 0)
+//				{
+//					if(runflg>=3000)
+//					{
+//						GPIO_WriteBit(GPIOB,BT_LED_GPIO_PIN,0);
+//					}
+//				}
+//				else
+//				{
+//					PowerLEDFlash(bq*20);
+//				}
 //			}
 //		}
 //		if(gBt_power_tm != 0)
@@ -908,6 +935,55 @@ void Send_val(int32_t val)
 	}
 }
 
+void WifiButtonScan(void)
+{
+	static uint16_t gBt_power_tm=0;
+
+	if (isWifiButtonDown())
+	{
+		gBt_power_tm+=20;
+		if (gBt_power_tm >= 15000)  // 15秒后指示电量状态
+		{
+			gBt_power_tm = 0;
+		}
+		else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
+		{
+			GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN);
+			PowerLEDFlash(1);
+		}
+		else if (gBt_power_tm >= 5000) // 5秒后慢闪，开始重置，此时可松开按钮
+		{
+			PowerLEDFlash(500);
+			GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
+		}
+		else//5秒内快闪
+		{
+			PowerLEDFlash(100);
+		}
+	}
+	else
+	{	
+		if (gBt_power_tm >= 5000)//已重置网络
+		{
+			gBt_power_tm+=20;
+			if (gBt_power_tm >= 15000) // 15秒后指示电量状态
+			{
+				gBt_power_tm = 0;
+			}
+			else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
+			{
+				GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN);
+				PowerLEDFlash(1);
+			}
+		}
+		else
+		{
+			gBt_power_tm = 0;
+			GetBattaryQuantity();
+		}
+	}
+}
+
 
 int16_t test_cuttent[500] = {0};
 uint16_t test_index = 0;
@@ -1033,8 +1109,8 @@ static uint8_t powofflg=0;
 	for(;;)
 	{
 		StateLEDFlash(500);
-		PowerButtonScan();
-		
+		//PowerButtonScan();
+		WifiButtonScan();
 		gGripModuleState = Grip_GetModuleState();
 		
 		if ((cut_motor.current >= 9660)&&(cut_motor.current < 14600))    //正转
