@@ -1421,7 +1421,7 @@ static uint8_t powofflg=0;
 			tm_cut = 0;
 		}
 		
-			gZeroVoltageTim += 1;
+			gZeroVoltageTim += 20;
 			if (gZeroVoltageTim > 60000) 
 			{
 				if(tool_state != RT_TOOL_WORKING&&powofflg==0)
