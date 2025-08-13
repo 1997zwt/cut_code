@@ -150,7 +150,8 @@ V4.4.51.20250717
 cuttool_FailRecoder
 setting -flash
 
-
+V4.4.52.20250813
+1.修改WIFi重置方法，增加按键消抖时间。
 
 
 

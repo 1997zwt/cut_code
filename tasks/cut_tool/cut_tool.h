@@ -70,6 +70,9 @@ struct home_detect
 #define WIFI_RELOAD_GPIO_CLK 	    RCC_APB2Periph_GPIOB		/* GPIO¶Ë¿ÚÊ±ÖÓ */
 #define WIFI_RELOAD_PIN				GPIO_Pin_13	
 
+#define WIFIBUTTON_PIN        GPIO_Pin_1
+#define isWifiButtonDown()  (GPIOB->IDR & WIFIBUTTON_PIN)
+
 #define DisablePowerShut()						GPIOB->BSRR = POWON_GPIO_PIN;
 #define EnablePowerShut()					GPIOB->BRR = POWON_GPIO_PIN;
 
