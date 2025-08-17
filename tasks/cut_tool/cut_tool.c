@@ -1036,7 +1036,7 @@ void SoftTim1ms_callback(void *ptmr, void *parg)
 		{
 			//this_current = Cutter_GetMotorCurrent();
 			//homedetect();
-			if(hometim<15000)
+			if(hometim<18000)
 			{
 				hometim +=1;
 			}else{
@@ -1044,7 +1044,7 @@ void SoftTim1ms_callback(void *ptmr, void *parg)
 				Grip_Control(MOTOR_CMD_STOP,0);
 				tool_state = TOOL_STATE_HOMEFAILURE;
 				gFault.fault = FAULT_HOMESENSOR;
-				cuttool_FailRecoder(HOMESENSOR_MOD,0,0);
+				cuttool_FailRecoder(SCREW_MOD,0,0);
 				hometim=0;
 			}
 		}
@@ -1076,7 +1076,7 @@ void homedetect(void)
 				tool_state = TOOL_STATE_MANUL; 
 				gFault.fault = FAULT_HOMESENSOR;
 				tm_cut_1 = 0;
-				cuttool_FailRecoder(HOMESENSOR_MOD,this_current,ht.aver_curent);
+				cuttool_FailRecoder(SCREW_MOD,this_current,ht.aver_curent);
 				ht.flg=2;
 			}
 		}else if(ht.flg==0&&ht.motiontim <= ReadUserSettings(CUT_DETECT_TIME_1))
@@ -1155,13 +1155,13 @@ static uint8_t powofflg=0;
 				{
 					tm_cut_1 = 0;
 					cut_step=7;
-				}else if(tm_cut_1>=15000)
+				}else if(tm_cut_1>=18000)
 				{
 					Steering_Motor_Move(&cut_motor,cut_motor.origin);
 					tm_cut_1=0;
 					tool_state = TOOL_STATE_FAILURE;
 					gFault.fault = FAULT_HOMESENSOR;
-					cuttool_FailRecoder(HOMESENSOR_MOD,cut_step,0);
+					cuttool_FailRecoder(SCREW_MOD,cut_step,0);
 				}
 			}else if(cut_step == 7)
 			{
