@@ -161,8 +161,7 @@ typedef enum
 {
 	TOOL_MOD,
 	SCREW_MOD,
-	HOMESENSOR_MOD,
-	GRIP_MOD,
+	GRIP_MOD=5,
 }Module_Code;
 
 typedef enum
