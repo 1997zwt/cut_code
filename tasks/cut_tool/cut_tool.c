@@ -931,52 +931,57 @@ void homedetect(void)
 	}
 }
 
+
 void WifiButtonScan(void)
 {
-	static uint16_t gBt_power_tm=0;
+	static uint16_t gBt_power_tm = 0;
 
 	if (isWifiButtonDown())
 	{
-		gBt_power_tm+=20;
-		if (gBt_power_tm >= 15000)  // 15秒后指示电量状态
-		{
-			gBt_power_tm = 0;
-		}
-		else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
-		{
-			GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN);
-			PowerLEDFlash(1);
-		}
-		else if (gBt_power_tm >= 5000) // 5秒后慢闪，开始重置，此时可松开按钮
-		{
-			PowerLEDFlash(500);
-			GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
-		}
-		else//5秒内快闪
-		{
-			PowerLEDFlash(100);
-		}
+	gBt_power_tm+=20;
+	if (gBt_power_tm >= 15000) // 15秒后指示电量状态
+	{
+		PowerLEDFlash(1);
+	}
+else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
+{
+	GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
+	PowerLEDFlash(100);
+}
+else if (gBt_power_tm >= 5000) // 5秒后快闪，开始重置，此时可松开按钮
+{
+	PowerLEDFlash(100);
+	GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
+	}
+	else // 5秒内慢闪
+	{
+	PowerLEDFlash(500);
+	}
 	}
 	else
-	{	
-		if (gBt_power_tm >= 5000)//已重置网络
-		{
-			gBt_power_tm+=20;
-			if (gBt_power_tm >= 15000) // 15秒后指示电量状态
-			{
-				gBt_power_tm = 0;
-			}
-			else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
-			{
-				GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN);
-				PowerLEDFlash(1);
-			}
-		}
-		else
-		{
-			gBt_power_tm = 0;
-			GetBattaryQuantity();
-		}
+	{
+	if (gBt_power_tm >= 5000) // 已重置网络
+	{
+	gBt_power_tm+=20;
+	if (gBt_power_tm >= 15000) // 15秒后指示电量状态
+	{
+	gBt_power_tm = 0;
+	}
+	else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
+	{
+	GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
+	//PowerLEDFlash(1);
+	}
+	else
+	{
+	//PowerLEDFlash(500);
+	}
+	}
+	else
+	{
+	gBt_power_tm = 0;
+	}
+	GetBattaryQuantity();
 	}
 }
 
