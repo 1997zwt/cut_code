@@ -24,6 +24,7 @@ uint8_t cut_start_position = 100;
 uint16_t gCutPauseTm=0;//切刀从工作到暂停的时间限制
 uint32_t gZeroVoltageTim = 0;
 OS_TMR *gSoftT1ms = NULL;
+uint8_t BatteryLevel;
 struct home_detect ht={0};
 
 ToolFaultCode faultcode=FAULT_CODE_NONE;
@@ -37,7 +38,7 @@ uint8_t m_err;
  
 uint8_t GetBattaryQuantity(void)
 {
-	uint8_t BatteryLevel;
+
 	static uint16_t runflg=0;
 	
 	if(runflg<5000)
@@ -70,7 +71,8 @@ void CutTool_SendState(void)    //状态反馈
 
 	if (OSMutexAccept(USART_MUTEX,&m_err))
 	{
-		buf[6] = GetBattaryQuantity();
+		//buf[6] = GetBattaryQuantity();
+		buf[6] = BatteryLevel;
 		buf[7] = tool_state;
 		//buf[8] = faultcode;
 		buf[8] = gSensorState + (gCameraState << 6);
@@ -732,7 +734,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 					rt = RT_TOOL_WORKING;
 				break;
 			case TOOL_CMD_WORK:
-				if(GetBattaryQuantity() > ReadUserSettings(POWER_LOW_LIMIT))
+				if(BatteryLevel > ReadUserSettings(POWER_LOW_LIMIT))
 				{
 					if (*data == 0) //工作准备
 					{
@@ -941,50 +943,50 @@ void WifiButtonScan(void)
 
 	if (isWifiButtonDown())
 	{
-	gBt_power_tm++;
-	if (gBt_power_tm >= 15000) // 15秒后指示电量状态
-	{
-		PowerLEDFlash(1);
-	}
-else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
-{
-	GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
-	PowerLEDFlash(100);
-}
-else if (gBt_power_tm >= 5000) // 5秒后快闪，开始重置，此时可松开按钮
-{
-	PowerLEDFlash(100);
-	GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
-	}
-	else // 5秒内慢闪
-	{
-	PowerLEDFlash(500);
-	}
-	}
-	else
-	{
-	if (gBt_power_tm >= 5000) // 已重置网络
-	{
-	gBt_power_tm++;
-	if (gBt_power_tm >= 15000) // 15秒后指示电量状态
-	{
-	gBt_power_tm = 0;
-	}
-	else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
-	{
-	GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
-	//PowerLEDFlash(1);
+		gBt_power_tm+=20;
+		if (gBt_power_tm >= 15000) // 15秒后指示电量状态
+		{
+			PowerLEDFlash(1);
+		}
+		else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
+		{
+			GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
+			PowerLEDFlash(100);
+		}
+		else if (gBt_power_tm >= 5000) // 5秒后快闪，开始重置，此时可松开按钮
+		{
+			PowerLEDFlash(100);
+			GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
+		}
+		else // 5秒内慢闪
+		{
+			PowerLEDFlash(500);
+		}
 	}
 	else
 	{
-	//PowerLEDFlash(500);
-	}
-	}
-	else
-	{
-	gBt_power_tm = 0;
-	}
-	GetBattaryQuantity();
+		if (gBt_power_tm >= 5000) // 已重置网络
+		{
+			gBt_power_tm+=20;
+			if (gBt_power_tm >= 15000) // 15秒后指示电量状态
+			{
+				gBt_power_tm = 0;
+			}
+			else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
+			{
+				GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
+				//PowerLEDFlash(1);
+			}
+			else
+			{
+				//PowerLEDFlash(500);
+			}
+		}
+		else
+		{
+			gBt_power_tm = 0;
+		}
+		GetBattaryQuantity();
 	}
 }
 
