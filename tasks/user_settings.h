@@ -22,7 +22,7 @@
 
 //////////////////////////////////////////////////////////////
 
-#define SOFT_VERSION	4300
+#define SOFT_VERSION	4224
 #define SOFT_DATE		20250808
 
 #define		PRO_HEAD0	0xAA
