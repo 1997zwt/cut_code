@@ -24,6 +24,7 @@ uint8_t cut_start_position = 100;
 uint16_t gCutPauseTm=0;//切刀从工作到暂停的时间限制
 uint32_t gZeroVoltageTim = 0;
 OS_TMR *gSoftT1ms = NULL;
+uint8_t BatteryLevel;
 struct home_detect ht={0};
 
 ToolFaultCode faultcode=FAULT_CODE_NONE;
@@ -37,7 +38,7 @@ uint8_t m_err;
  
 uint8_t GetBattaryQuantity(void)
 {
-	uint8_t BatteryLevel;
+	
 	static uint16_t runflg=0;
 	
 	if(runflg<5000)
@@ -70,7 +71,8 @@ void CutTool_SendState(void)    //状态反馈
 
 	if (OSMutexAccept(USART_MUTEX,&m_err))
 	{
-		buf[6] = GetBattaryQuantity();
+		//buf[6] = GetBattaryQuantity();
+		buf[6] =BatteryLevel;
 		buf[7] = tool_state;
 		buf[8] = faultcode;
 		buf[9] = gSensorState + (gCameraState << 6);
@@ -621,7 +623,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 					rt = RT_TOOL_WORKING;
 				break;
 			case TOOL_CMD_WORK:
-				if(GetBattaryQuantity() > ReadUserSettings(POWER_LOW_LIMIT))
+				if(BatteryLevel > ReadUserSettings(POWER_LOW_LIMIT))
 				{
 					if (*data == 0) //工作准备
 					{
