@@ -349,6 +349,8 @@ void Task_Protocol(void *p_arg)
 	#ifdef	__IAP_H_
 						if (databuf[3] == DEVICE_CMD_UPGRADE)
 						{
+							Log_Debug(3);
+							TIM_DeInit(TIM3);
 							IAP_Handle("menu");
 						}
 	#endif

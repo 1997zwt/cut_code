@@ -24,7 +24,7 @@ void InitUserSettings(uint8_t flg)
 
 	if ((!TSB(gUserSettings[SYS_FLGS],FLG_SAVE)) || (gUserSettings[SYS_FLGS] == -1))// 测试对应位是否1
 	{
-		for (i=0;i<USER_SETTING_SIZE;i++)
+		for (i=10;i<USER_SETTING_SIZE;i++)
 		{
 			gUserSettings[i]=0;
 		}
@@ -52,7 +52,7 @@ void InitUserSettings(uint8_t flg)
 		gUserSettings[GRIP_HOME_CURRENT] = 1000;  //500第一次复位的时候用电流
 		gUserSettings[GRIP_MOVE_OVERTIME] = 7000;
 		gUserSettings[GRIP_POSITIVE_LIMIT] = 300;  //没线的时候用的是位置限位
-		gUserSettings[GRIP_NEGATIVE_LIMIT] = 5;  //有线的时候用的是位置限位
+		gUserSettings[GRIP_NEGATIVE_LIMIT] = 10;  //有线的时候用的是位置限位
 		
 		gUserSettings[CUT_DETECT_TIME_1]=3500;
 		gUserSettings[CUT_DETECT_MAXRATIO]=13;

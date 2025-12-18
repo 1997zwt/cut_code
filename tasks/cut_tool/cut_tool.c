@@ -1420,9 +1420,9 @@ static uint8_t powofflg=0;
 		
 		
 		tm_cut += 20;
+		Realtime_Qtity();
 		if (tm_cut > 100)
 		{
-			Realtime_Qtity();
 			CutTool_SendState();
 			tm_cut = 0;
 		}

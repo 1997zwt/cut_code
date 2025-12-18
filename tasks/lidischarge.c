@@ -30,7 +30,7 @@ void Realtime_Qtity(void)
       Lisup.LastQtity = 100.0;
       Lisup.SlopeQ = 0.469683;
       Lisup.bat=9000;
-      Lisup.consumsec=0.05;
+      Lisup.consumsec=0.04;
       Lisup.coulomb =((Lisup.StartVol-Lisup.EndVol)/Lisup.SlopeQ)+Lisup.Endcolun;//C
       Lisup.tatolcolun=Lisup.coulomb;//?貫C
   }else{
