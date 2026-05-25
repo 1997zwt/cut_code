@@ -38,7 +38,7 @@ uint8_t m_err;
  
 uint8_t GetBattaryQuantity(void)
 {
-	
+
 	static uint16_t runflg=0;
 	
 	if(runflg<5000)
@@ -72,7 +72,7 @@ void CutTool_SendState(void)    //状态反馈
 	if (OSMutexAccept(USART_MUTEX,&m_err))
 	{
 		//buf[6] = GetBattaryQuantity();
-		buf[6] =BatteryLevel;
+		buf[6] = BatteryLevel;
 		buf[7] = tool_state;
 		buf[8] = faultcode;
 		buf[9] = gSensorState + (gCameraState << 6);
@@ -82,7 +82,7 @@ void CutTool_SendState(void)    //状态反馈
 		
 		buf[11] = grip_motor_state.motion_state+ (grip_motor_state.work_state<<2) + (gGripModuleState<<4);
 
-		buf[12] = buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8] + buf[9] + buf[10]+buf[11];
+		buf[12] = buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8] + buf[9] + buf[10]+ buf[11];
 		UART_SendBuf(TOOL_CONTROL_PORT,buf,13);
 		OSMutexPost(USART_MUTEX);	
 	}
@@ -201,7 +201,13 @@ void GPIO_Config(void)
 		GPIO_Init(SENSOR1_GPIO_PORT, &GPIO_InitStructure);	
 
 /****************************************************************/
+		GPIO_InitStructure.GPIO_Pin = WIFIBUTTON_PIN;	
 
+		/*设置引脚模式为浮空输入*/
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    
+		/*调用库函数，初始化GPIO*/
+		GPIO_Init(GPIOB, &GPIO_InitStructure);	
 /******************************SENSOR2传感器****************************///复位极限 
 		/*选择要控制的GPIO引脚*/
 		GPIO_InitStructure.GPIO_Pin = SENSOR2_GPIO_PIN;	
@@ -214,13 +220,7 @@ void GPIO_Config(void)
 
 /****************************************************************/
 
-		GPIO_InitStructure.GPIO_Pin = WIFIBUTTON_PIN;	
 
-		/*设置引脚模式为浮空输入*/
-        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    
-		/*调用库函数，初始化GPIO*/
-		GPIO_Init(GPIOB, &GPIO_InitStructure);	
 /******************************POWER_IN电源按键检测****************************/   
 		/*选择要控制的GPIO引脚*/
 //		GPIO_InitStructure.GPIO_Pin = POWIN_GPIO_PIN;	
@@ -349,6 +349,117 @@ void PowerLEDFlash(uint16_t period)
 	}
 }
 
+void PowerButtonScan(void)
+{
+	static uint8_t power_state = 0;
+	static uint16_t gBt_power_tm=0;
+	uint16_t bq;
+
+//	if (isPowerButtonDown())
+//	{
+//		gBt_power_tm +=20 ;
+//		if (!power_state)//如果没电
+//		{
+//			if (gBt_power_tm >= 15000)//15秒
+//			{
+//				PowerLEDFlash(100);//按钮灯快闪
+//				CutTool_Control(0,TOOL_CMD_FACTORY_RESET,0);
+//			}
+//			else if (gBt_power_tm >= 10000)
+//			{
+//				PowerLEDFlash(500);  
+//				GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
+//			}
+//			else if (gBt_power_tm >= 500)
+//			{
+//				PowerLEDFlash(1);
+//				SetPowerOn();
+//			}
+//		}
+//		else
+//		{			
+//			if (gBt_power_tm >= 15000)
+//			{
+//			}
+//			else if (gBt_power_tm >= 10000)
+//			{
+//				gWorkTimes = 0;
+//				WriteUserSettings(VER_MODIFY_TIMES,0);
+//				WriteUserSettings(WORK_TIMES,gWorkTimes);
+//				PowerLEDFlash(1);
+//			}
+//			else if (gBt_power_tm >= 5000)
+//			{
+//				PowerLEDFlash(200);
+//			}
+//			else if (gBt_power_tm >= 2000)
+//			{
+//				PowerLEDFlash(100);
+//			}
+//			else
+//			{
+//				PowerLEDFlash(0);
+//			}
+//		}
+//	}
+//	else
+//	{	
+//		if (!power_state)
+//		{
+//			power_state = 1;
+//			GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN);
+//		}	
+//		else
+//		{
+//			if (gBt_power_tm >= 10000)
+//			{
+//				SaveUserSettings();
+//			}
+//			else if (gBt_power_tm >= 5000)
+//			{
+//			}
+//			else if (gBt_power_tm >= 2000) //2S关机
+//			{
+//				if (power_state)
+//				{
+//					power_state = 0;
+//					WriteUserSettings(VER_MODIFY_TIMES,ReadUserSettings(VER_MODIFY_TIMES)-1);
+//					SaveUserSettings();
+//					#ifdef USE_BOOTLOADER
+//					iapUserSettings[IAP_WORK_TIMES]=gWorkTimes;
+//					IAP_FUN_WriteFlag(IAP_WRITE_POWER,0,POWER_OFF_DATA); 
+//					#endif
+
+//					delay_ms(10);
+//					SetPowerOff();
+//				}
+//			}
+//			else
+//			{
+//				bq = GetBattaryQuantity();
+//				if (bq > 50)
+//				{
+//					PowerLEDFlash(0);
+//				}
+//				else if(bq == 0)
+//				{
+//					if(runflg>=3000)
+//					{
+//						GPIO_WriteBit(GPIOB,BT_LED_GPIO_PIN,0);
+//					}
+//				}
+//				else
+//				{
+//					PowerLEDFlash(bq*20);
+//				}
+//			}
+//		}
+//		if(gBt_power_tm != 0)
+//		{
+//			gBt_power_tm = 0;
+//		}
+//	}
+}
 
 void CutMotor_SetPWM(uint16_t DutyRadio)
 {
@@ -655,8 +766,11 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 					if (tool_state == TOOL_STATE_MANUL)
 					{
 						hometim=0;
-		Grip_Control(MOTOR_CMD_UNLOCK,0);
-		tool_state = TOOL_STATE_UNLOCKING;
+						rt = Grip_Control(MOTOR_CMD_UNLOCK,0);
+						if(rt==RT_OK)
+						{
+							tool_state = TOOL_STATE_UNLOCKING;
+						}
 					}
           else
 					rt = RT_TOOL_NOT_MANUL;
@@ -826,6 +940,59 @@ void Send_val(int32_t val)
 	}
 }
 
+void WifiButtonScan(void)
+{
+	static uint16_t gBt_power_tm = 0;
+
+	if (isWifiButtonDown())
+	{
+		gBt_power_tm+=20;
+		if (gBt_power_tm >= 15000) // 15秒后指示电量状态
+		{
+			PowerLEDFlash(1);
+		}
+		else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
+		{
+			GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
+			PowerLEDFlash(100);
+		}
+		else if (gBt_power_tm >= 5000) // 5秒后快闪，开始重置，此时可松开按钮
+		{
+			PowerLEDFlash(100);
+			GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
+		}
+		else // 5秒内慢闪
+		{
+			PowerLEDFlash(500);
+		}
+	}
+	else
+	{
+		if (gBt_power_tm >= 5000) // 已重置网络
+		{
+			gBt_power_tm+=20;
+			if (gBt_power_tm >= 15000) // 15秒后指示电量状态
+			{
+				gBt_power_tm = 0;
+			}
+			else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
+			{
+				GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
+				//PowerLEDFlash(1);
+			}
+			else
+			{
+				//PowerLEDFlash(500);
+			}
+		}
+		else
+		{
+			gBt_power_tm = 0;
+		}
+		GetBattaryQuantity();
+	}
+}
+
 
 int16_t test_cuttent[500] = {0};
 uint16_t test_index = 0;
@@ -930,60 +1097,6 @@ void homedetect(void)
 		ht.flg=0;
 		ht.aver_curent=0;
 		ht.betime=0;
-	}
-}
-
-
-void WifiButtonScan(void)
-{
-	static uint16_t gBt_power_tm = 0;
-
-	if (isWifiButtonDown())
-	{
-	gBt_power_tm+=20;
-	if (gBt_power_tm >= 15000) // 15秒后指示电量状态
-	{
-		PowerLEDFlash(1);
-	}
-else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
-{
-	GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
-	PowerLEDFlash(100);
-}
-else if (gBt_power_tm >= 5000) // 5秒后快闪，开始重置，此时可松开按钮
-{
-	PowerLEDFlash(100);
-	GPIO_ResetBits(GPIOB,WIFI_RELOAD_PIN);
-	}
-	else // 5秒内慢闪
-	{
-	PowerLEDFlash(500);
-	}
-	}
-	else
-	{
-	if (gBt_power_tm >= 5000) // 已重置网络
-	{
-	gBt_power_tm+=20;
-	if (gBt_power_tm >= 15000) // 15秒后指示电量状态
-	{
-	gBt_power_tm = 0;
-	}
-	else if (gBt_power_tm >= 10000) // 10秒后重置完成，指示灯常亮
-	{
-	GPIO_SetBits(GPIOB,WIFI_RELOAD_PIN); // 重置完成
-	//PowerLEDFlash(1);
-	}
-	else
-	{
-	//PowerLEDFlash(500);
-	}
-	}
-	else
-	{
-	gBt_power_tm = 0;
-	}
-	GetBattaryQuantity();
 	}
 }
 
@@ -1310,9 +1423,9 @@ static uint8_t powofflg=0;
 		
 		
 		tm_cut += 20;
+		Realtime_Qtity();
 		if (tm_cut > 100)
 		{
-			Realtime_Qtity();
 			CutTool_SendState();
 			tm_cut = 0;
 		}
