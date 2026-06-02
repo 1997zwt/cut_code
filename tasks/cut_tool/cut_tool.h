@@ -83,7 +83,7 @@ void StateLEDFlash(uint16_t period);
 void PowerButtonScan(void);
 void PowerLEDFlash(uint16_t period);
 
-
+void SoftTim1ms_callback(void *ptmr, void *parg);
 //配置工具的任务,不用改
 #define TOOL_TASK_STK_SIZE							300
 extern OS_STK tool_task_stk[TOOL_TASK_STK_SIZE]; 

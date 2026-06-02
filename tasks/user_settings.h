@@ -22,8 +22,8 @@
 
 //////////////////////////////////////////////////////////////
 
-#define SOFT_VERSION	4400
-#define SOFT_DATE		20250417
+#define SOFT_VERSION	4300
+#define SOFT_DATE		20260525
 
 #define		PRO_HEAD0	0xAA
 #define		PRO_HEAD1 0x55

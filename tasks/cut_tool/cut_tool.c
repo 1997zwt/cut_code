@@ -23,6 +23,8 @@ int32_t gWorkTimes = 0;
 uint8_t cut_start_position = 100;
 uint16_t gCutPauseTm=0;//切刀从工作到暂停的时间限制
 
+OS_TMR *gSoftT1ms = NULL;
+
 ToolFaultCode faultcode=FAULT_CODE_NONE;
 
 extern stGripDef gGrip;
@@ -418,6 +420,36 @@ void InitAllMotors(void)
 	Grip_Init(0);
 }
 
+int16_t Cutter_GetMotorCurrent(void)
+{
+	static int16_t cutter_currentbuf[10];
+	static uint8_t cutter_current_index = 0;
+	uint8_t i = 0;
+	int32_t temp = 0;
+	int16_t rescurrent=0;
+	//电流10次平均值滤波
+	cutter_currentbuf[cutter_current_index] = CutMotor_GetCurrent();
+	cutter_current_index++;
+	if (cutter_current_index == 10)
+		cutter_current_index = 0;
+	for (i = 0; i < 10; i++)
+		temp += cutter_currentbuf[i];
+	rescurrent = temp / 10;
+
+	return rescurrent;
+}
+
+void Creat_softTimer(void)
+{
+    uint8_t err;
+
+	if (gSoftT1ms == NULL)
+	{
+		gSoftT1ms = OSTmrCreate(100, 1, OS_TMR_OPT_PERIODIC, SoftTim1ms_callback, NULL, NULL, &err);
+		OSTmrStart(gSoftT1ms, &err);
+	}
+}
+
 void InitAllDevice(void)
 {
 	uint16_t succrunFLAG;
@@ -449,6 +481,7 @@ void InitAllDevice(void)
 		gCutModuleState = MODULE_STATE_HOME;
 		cut_motor_state.work_state = WORK_STATE_HOME;
 	}
+	Creat_softTimer();
 }
 void SendDeviceInfo(void)
 {
@@ -602,6 +635,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 			case TOOL_CMD_STOP:
 				Grip_Control(MOTOR_CMD_STOP,0);
 				CutMotorControl(MOTOR_CMD_STOP,0);
+				faultcode = FAULT_CODE_NONE;
 				tool_state = TOOL_STATE_STOPPING;//改变工具状态为停止
 				break;
 			case TOOL_CMD_READY:
@@ -631,6 +665,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 				{
 					Grip_Control(MOTOR_CMD_HOME,0);
 					CutMotorControl(MOTOR_CMD_HOME,0);
+					faultcode = FAULT_CODE_NONE;
 					hometim=0;
 					tool_state = TOOL_STATE_HOMING;
 				}
@@ -731,10 +766,18 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 			if (TSB(motor,MOTOR_CUT))
 			{
 				rt = CutMotorControl(cmd,speed);
+				if(rt == RT_OK)
+				{
+					tool_state = TOOL_STATE_MANUL;
+				}
 			}
 			if (TSB(motor,MOTOR_GRIP))
 			{
 				rt = Grip_Control(cmd,speed);
+				if(rt == RT_OK)
+				{
+					tool_state = TOOL_STATE_MANUL;
+				}
 			}			
 		}
 	}
@@ -747,6 +790,63 @@ uint16_t test_index = 0;
 int16_t this_current = 0;
 
 uint16_t test_tm2=0;
+
+void SoftTim1ms_callback(void *ptmr, void *parg)
+{
+	Grip_Update();
+	Cutter_GetMotorCurrent();
+	if(IsHomeSensorOn())
+	{			
+		STB(gSensorState,1);
+		if(cut_motor_state.motion_state == MOTION_STATE_STOPPED)
+		{
+			gCutModuleState = MODULE_STATE_HOME;
+
+			
+			if(tool_state == TOOL_STATE_HOMING)
+			{
+				if (gGripModuleState == MODULE_STATE_HOME)
+				{
+					tool_state = TOOL_STATE_HOMED;						
+				}
+			}
+		}
+		else if (cut_motor_state.motion_state == MOTION_STATE_CCW)
+		{
+			Steering_Motor_Move(&cut_motor,cut_motor.origin);
+		}
+	}
+	else if(IsWorkSensorOn())
+	{
+		STB(gSensorState,0);
+		if(cut_motor_state.motion_state == MOTION_STATE_STOPPED)
+		{
+			gCutModuleState = MODULE_STATE_MAX;
+			test_index = 0;
+		}
+		else if (cut_motor_state.motion_state == MOTION_STATE_CW)
+		{
+			Steering_Motor_Move(&cut_motor,cut_motor.origin);
+		}			
+	}
+	else
+	{			
+		gSensorState = 0;
+		if(tool_state == TOOL_STATE_HOMING)
+		{
+			if(hometim<18000)
+			{
+				hometim +=1;
+			}else{
+				Steering_Motor_Move(&cut_motor,0);
+				Grip_Control(MOTOR_CMD_STOP,0);
+			tool_state = TOOL_STATE_HOMEFAILURE;
+			faultcode = FAULT_HOMESENSOR;
+				hometim=0;
+			}
+		}
+	}
+}
 
 void Task_Tool(void *p_arg)
 {
@@ -764,7 +864,6 @@ void Task_Tool(void *p_arg)
 	{
 		StateLEDFlash(500);
 		PowerButtonScan();
-		Grip_Update();
 		gGripModuleState = Grip_GetModuleState();
 		
 		if ((cut_motor.current >= 9660)&&(cut_motor.current < 14600))    //正转
@@ -788,7 +887,7 @@ void Task_Tool(void *p_arg)
 		if (tool_state == TOOL_STATE_WORK)
 		{
 			tm_cut_1 += 20;
-			this_current = CutMotor_GetCurrent();
+			this_current = Cutter_GetMotorCurrent();
 			if (cut_step == 0)//开始断线
 			{
 				if(!IsHomeSensorOn())
@@ -856,6 +955,11 @@ void Task_Tool(void *p_arg)
 					Steering_Motor_Move(&cut_motor,cut_motor.origin);
 					tm_cut_1 = 0;
 					cut_step =3;
+				}else if((tm_cut_1 > 20000))
+				{
+					Steering_Motor_Move(&cut_motor,cut_motor.origin);
+					tm_cut_1 = 0;
+					cut_step=11;
 				}
 			}
 			else if (cut_step == 3)//切刀复位
@@ -872,6 +976,14 @@ void Task_Tool(void *p_arg)
 				if (cut_motor_state.motion_state == MOTION_STATE_CCW)
 				{
 					if (IsHomeSensorOn() || tm_cut_1 > 20000)
+					{
+						Steering_Motor_Move(&cut_motor,cut_motor.origin);
+						tm_cut_1 = 0;
+						cut_step = 5;
+					}
+				}else if(cut_motor_state.motion_state== MOTION_STATE_STOPPED)
+				{
+					if(IsHomeSensorOn())
 					{
 						Steering_Motor_Move(&cut_motor,cut_motor.origin);
 						tm_cut_1 = 0;
@@ -972,56 +1084,7 @@ void Task_Tool(void *p_arg)
 		}
 
 
-		if(IsHomeSensorOn())
-		{			
-			STB(gSensorState,1);
-			if(cut_motor_state.motion_state == MOTION_STATE_STOPPED)
-			{
-				gCutModuleState = MODULE_STATE_HOME;
-
-				
-				if(tool_state == TOOL_STATE_HOMING)
-				{
-					if (gGripModuleState == MODULE_STATE_HOME)
-					{
-						tool_state = TOOL_STATE_HOMED;						
-					}
-				}
-			}
-			else if (cut_motor_state.motion_state == MOTION_STATE_CCW)
-			{
-				Steering_Motor_Move(&cut_motor,cut_motor.origin);
-			}
-		}
-		else if(IsWorkSensorOn())
-		{
-			STB(gSensorState,0);
-			if(cut_motor_state.motion_state == MOTION_STATE_STOPPED)
-			{
-				gCutModuleState = MODULE_STATE_MAX;
-				test_index = 0;
-			}
-			else if (cut_motor_state.motion_state == MOTION_STATE_CW)
-			{
-				Steering_Motor_Move(&cut_motor,cut_motor.origin);
-			}			
-		}
-		else
-		{			
-			gSensorState = 0;
-			if(tool_state == TOOL_STATE_HOMING)
-			{
-				if(hometim<15000)
-				{
-					hometim +=20;
-				}else{
-					Steering_Motor_Move(&cut_motor,0);
-				tool_state = TOOL_STATE_HOMEFAILURE;
-				faultcode = FAULT_HOMESENSOR;
-					hometim=0;
-				}
-			}
-		}
+		
 
 		if(cut_motor_state.work_state == WORK_STATE_WORK)
 		{

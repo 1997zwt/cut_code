@@ -464,7 +464,11 @@ void Grip_Update(void)
 		{
 			gGrip.mode = 10;
 			gGrip.step = 0;
-			Servo_Motor_Enable(&gGripMotor, FALSE);
+			if(gGrip.timer>=1000)
+			{
+				Servo_Motor_Enable(&gGripMotor, FALSE);
+			}
+
 		}
 	}
 	// if (test_step[test_index] != gGrip.step)
