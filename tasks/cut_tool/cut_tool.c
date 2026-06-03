@@ -25,6 +25,7 @@ uint16_t gCutPauseTm=0;//切刀从工作到暂停的时间限制
 uint32_t gZeroVoltageTim = 0;
 OS_TMR *gSoftT1ms = NULL;
 uint8_t BatteryLevel;
+uint32_t heartbeat_timer;
 struct home_detect ht={0};
 
 ToolFaultCode faultcode=FAULT_CODE_NONE;
@@ -1000,10 +1001,43 @@ int16_t this_current = 0;
 uint16_t tm_cut_1 = 0;
 uint16_t test_tm2=0;
 
+void StripTool_Heartbeat_clear(void)
+{
+	heartbeat_timer = 0;
+
+	if (gFault.fault == err_tool_communicate_fault)
+	{
+		gFault.fault = 0;
+	}	
+}
+
 void SoftTim1ms_callback(void *ptmr, void *parg)
 {
 	Grip_Update();
 	Cutter_GetMotorCurrent();
+	if (ReadUserSettings(TOOL_CONTROL_WORD_HEARTBEAT) > 0)
+	{
+		//工作状态下心跳计数器清零，不计数
+		if (tool_state == TOOL_STATE_WORK)
+		{
+			StripTool_Heartbeat_clear();
+		}			
+		if (heartbeat_timer == ReadUserSettings(TOOL_CONTROL_WORD_HEARTBEAT)*1000)
+		{
+			heartbeat_timer++;
+			//复位
+			CutTool_Control(0,TOOL_CMD_HOME,0);
+			gFault.fault = err_tool_communicate_fault;
+			gFault.tool_state = tool_state;
+			gFault.bat_vol = Lisup.RealVol;
+			gFault.module = 0;
+			gFault.info_1 = heartbeat_timer / 1000;
+		}
+		else
+		{
+			heartbeat_timer++;
+		}
+	}	
 	if(IsHomeSensorOn())
 	{			
 		STB(gSensorState,1);
@@ -1430,9 +1464,9 @@ static uint8_t powofflg=0;
 			tm_cut = 0;
 		}
 		
-			gZeroVoltageTim += 20;
-			if (gZeroVoltageTim > 60000) 
-			{
+		gZeroVoltageTim += 20;
+		if (gZeroVoltageTim > 60000) 
+		{
 				if(tool_state != RT_TOOL_WORKING&&powofflg==0)
 				{
 					powofflg=1;
@@ -1447,6 +1481,10 @@ static uint8_t powofflg=0;
 					EnablePowerShut();		
 			}
 		}
+		//心跳断联检测
+		//心跳时间间隔为1000ms,连续超过10分钟（默认值）未收到心跳，记录故障，同时复位抱紧和旋转
+		//配置参数为0时，关掉该功能
+
 
 		OSTimeDly(20);
 		IWDG_Feed();

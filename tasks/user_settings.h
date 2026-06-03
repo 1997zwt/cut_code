@@ -22,8 +22,8 @@
 
 //////////////////////////////////////////////////////////////
 
-#define SOFT_VERSION	4450
-#define SOFT_DATE		20251218
+#define SOFT_VERSION	4451
+#define SOFT_DATE		20260603
 
 #define		PRO_HEAD0	0xAA
 #define		PRO_HEAD1 0x55
@@ -79,7 +79,7 @@ typedef enum
 	CUT_CUT_SPEED_1,		//断线第一段速度   82
 	CUT_CUT_TIME_1,			//断线第一段时间
 	CUT_CUT_CURRENT_1,	//断线第一段截止电流   84
-	CUT_CUT_SPEED_2,		//断线第二段速度
+	TOOL_CONTROL_WORD_HEARTBEAT = 85,		//断线第二段速度
 	CUT_CUT_TIME_2,			//断线第二段时间   
 	CUT_CUT_CURRENT_2,	//断线第二段截止电流
 	CUT_CUT_TIME_3,			//断线第二段时间   

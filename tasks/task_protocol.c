@@ -263,6 +263,7 @@ void Task_Protocol(void *p_arg)
 }
 
 #elif defined USE_PROTOCOL_V3
+extern void StripTool_Heartbeat_clear(void);
 void Task_Protocol(void *p_arg)
 {
 	uint8_t databuf[256] = {0};
@@ -355,6 +356,7 @@ void Task_Protocol(void *p_arg)
 						}
 	#endif
 	#ifdef _CUT_TOOL_H
+						StripTool_Heartbeat_clear();
 						if ((databuf[3]&0x7F) == TOOL_TYPE_CUT)
 						{
 							CutTool_Control(databuf[4],databuf[5],&databuf[6]);
@@ -379,11 +381,14 @@ void Task_Protocol(void *p_arg)
 						}
 	#endif
 #ifdef USE_LOG
-						databuf[len - 1] = 0;
-						databuf[len] = 0;
-						databuf[len+1] = 0;
-						databuf[len+2] = 0;
-						Log_RecordCmdInfo(&databuf[3]);
+					if (databuf[3] != DEVICE_HEARTBEAT)
+					{
+							databuf[len - 1] = 0;
+							databuf[len] = 0;
+							databuf[len+1] = 0;
+							databuf[len+2] = 0;
+							Log_RecordCmdInfo(&databuf[3]);
+					}		
 	#endif
 					}
 					index = 0;

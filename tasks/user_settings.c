@@ -42,7 +42,7 @@ void InitUserSettings(uint8_t flg)
 		gUserSettings[CUT_CUT_SPEED_1] = 10000;       //
 		gUserSettings[CUT_CUT_TIME_1] = 0;
 		gUserSettings[CUT_CUT_CURRENT_1] = 2500;    //
-		gUserSettings[CUT_CUT_SPEED_2] = 0;
+		gUserSettings[TOOL_CONTROL_WORD_HEARTBEAT] = 600;//ƒ¨»œ÷µ10∑÷÷”
 		gUserSettings[CUT_CUT_TIME_2] = 0;        //
 		gUserSettings[CUT_CUT_CURRENT_2] = 0;
     gUserSettings[CUT_CUT_TIME_3] = 0;        //

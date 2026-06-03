@@ -76,6 +76,7 @@ typedef enum
 #define DEVICE_CMD_INFO		200		//查询设备信息
 #define DEVICE_CMD_UPGRADE	201		//固件升级
 #define DEVICE_SET_NO			202		//设置出厂编号
+#define DEVICE_HEARTBEAT 204
 
 //定义通用工具命令
 typedef enum
@@ -173,6 +174,7 @@ typedef enum
 	err_grip_unlock_fail,
 	err_zkgrip_disconnect,
 	ERR_NOT_SET_TIME=34,
+	err_tool_communicate_fault,
 }ToolFaultCode;
 
 
