@@ -768,6 +768,7 @@ void CutTool_Control(uint8_t motor, uint8_t cmd, uint8_t* data)
 				rt = CutMotorControl(cmd,speed);
 				if(rt == RT_OK)
 				{
+					Grip_Control(MOTOR_CMD_STOP,0);
 					tool_state = TOOL_STATE_MANUL;
 				}
 			}
@@ -950,7 +951,7 @@ void Task_Tool(void *p_arg)
 			}
 			else if (cut_step == 2)//通过传感器检测断线完成
 			{
-				if(IsWorkSensorOn() || (tm_cut_1 > 20000))
+				if(IsWorkSensorOn())
 				{
 					Steering_Motor_Move(&cut_motor,cut_motor.origin);
 					tm_cut_1 = 0;
