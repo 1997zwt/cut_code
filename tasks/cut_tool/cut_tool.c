@@ -1026,6 +1026,11 @@ void SoftTim1ms_callback(void *ptmr, void *parg)
 		{
 			heartbeat_timer++;
 			//¸´Î»
+			if(cut_motor_state.motion_state!=MOTION_STATE_STOPPED)
+			{
+				CutTool_Control(1,MOTOR_CMD_STOP,0);
+			}
+			CutTool_Control(2,MOTOR_CMD_STOP,0);
 			CutTool_Control(0,TOOL_CMD_HOME,0);
 			gFault.fault = err_tool_communicate_fault;
 			gFault.tool_state = tool_state;
@@ -1142,17 +1147,12 @@ void Task_Tool(void *p_arg)
 	
 	uint16_t tm_cut_2 = 0;
 	uint32_t tm_cut_tatal = 0;
-static uint8_t powofflg=0;
+	static uint8_t powofflg=0;
 	int16_t last_bat = 0;
-//	if(!ReadUserSettings(WIFI_NET_CONFIG))
-//	{
-//		CoifigWifiNet();
-//		WriteUserSettings(WIFI_NET_CONFIG,1);
-//	}
+
 	for(;;)
 	{
 		StateLEDFlash(500);
-		//PowerButtonScan();
 		WifiButtonScan();
 		gGripModuleState = Grip_GetModuleState();
 		
@@ -1163,11 +1163,6 @@ static uint8_t powofflg=0;
 		else if((cut_motor.current > 14700)&&(cut_motor.current < 19660))   //·´×ª
 		{
 			 cut_motor_state.motion_state = MOTION_STATE_CCW;
-//					test_cuttent[test_index++] = cut_motor.current;
-//					if (test_index == 500)
-//					{
-//							test_index = 0;
-//					}
 		}
 		else if((cut_motor.current <= 14700)&&(cut_motor.current >= 14600))    //Í£Ö¹
 		{
